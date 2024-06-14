@@ -8,9 +8,8 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from Experiment_Helper.helper import Helper, pca
-from Models.logisticRegression import LogisticRegression
+from Models.logisticRegression import LogisticRegression, training
 from Models.synapticIntelligence import continual_training
-from Models.logisticRegression import training
 from Models.recourseOriginal import recourse
 from Config.continual_config import train, test, sample, model, si
 from Dataset.makeDataset import Dataset
@@ -63,7 +62,7 @@ class Example9_Continual_Learning(Helper):
         sub_sample = Dataset(x[y_pred], pt.ones((y_pred.count_nonzero(), 1)))
 
         # recourse(model, sub_sample, 10,weight,loss_list=[])
-        recourse(model, sub_sample, 10, weights)
+        recourse(model, sub_sample, 10)
 
         x[y_pred] = sub_sample.x
 
@@ -90,7 +89,6 @@ class Example9_Continual_Learning(Helper):
         self.validation_list.append(val_data)
         sample_model = LogisticRegression(val_data.x.shape[1], 1)
         sample_model.train()
-        self.lr *= 0.8
         training(sample_model, val_data, 30)
         self.Aj_tide_list.append(self.calculate_accuracy(sample_model(val_data.x), val_data.y))
 
@@ -98,6 +96,9 @@ class Example9_Continual_Learning(Helper):
         self.addEFTDataFrame(j)
 
         continual_training(model, self.si, train, 50)
+
+        si.update_omega(train, nn.BCELoss())
+        si.consolidate()
 
         # calculate the overall accuracy
         self.overall_acc_list.append(self.calculate_AA(model, self.validation_list))
@@ -117,7 +118,10 @@ class Example9_Continual_Learning(Helper):
         # print("y_prob[y_prob < 0.5]",y_prob[y_prob < 0.5])
         recourseFailCnt = len(y_prob[y_prob < 0.5])
         # print("recourseFailCnt",recourseFailCnt)
-        recourseFailRate = recourseFailCnt / len(x[y_pred])
+        if len(x[y_pred]) == 0:
+            recourseFailRate = recourseFailCnt / 0.001
+        else:
+            recourseFailRate = recourseFailCnt / len(x[y_pred])
         # print("recourseFailRate : ",recourseFailRate)
         self.failToRecourse.append(recourseFailRate)
 
@@ -181,7 +185,7 @@ ex9.si = si
 # ani1 = ex1.animate_all(240)
 ex9.save_directory = DIRECTORY
 ani9 = ex9.animate_all(80)
-ani9.save(os.path.join(DIRECTORY, "ex9.gif"))
+ani9.save(os.path.join(DIRECTORY, "ex9.mp4"))
 
 # ex1.draw_PDt()
 ex9.draw_PDt()
