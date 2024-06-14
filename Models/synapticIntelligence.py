@@ -25,6 +25,7 @@ class SynapticIntelligence:
             loss.backward()
             for name, param in self.model.named_parameters():
                 if param.grad is not None:
+                    print("param.grad.data:", param.grad.data)
                     self.param_updates[name] += param.grad.data ** 2
 
     def consolidate(self):
@@ -42,7 +43,7 @@ class SynapticIntelligence:
         return lambda_ * si_loss
 
 # Training loop with SI
-def continual_training(model: nn.Module, si, dataset: Dataset, max_epochs: int, loss_list = None, lambda_ = 1):
+def continual_training(model: nn.Module, si, dataset: Dataset, max_epochs: int, loss_list = None, lambda_ = 0.5):
     loss: pt.Tensor
     criterion = nn.BCELoss()
     optimizer = optim.Adam(model.parameters(), 0.3)
