@@ -22,11 +22,12 @@ class Recourse(nn.Module):
 
 
 # def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.Tensor | None = None, loss_list: list | None = None):
-def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.Tensor = None, loss_list: list = None):
+def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.Tensor = None, loss_list: list = None,threshold = 1.0):
     loss: pt.Tensor
     r_model = Recourse(dataset.x.shape)
     criterion = nn.HuberLoss()
     optimizer = optim.Adam(r_model.parameters(), 0.1)
+    threshold = pt.ones(dataset.y.size())
     # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer)
 
     r_model.train()
@@ -34,7 +35,8 @@ def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.T
         optimizer.zero_grad()
         x_hat = r_model(dataset.x, weight)
         y_hat = c_model(x_hat)
-        loss = criterion(y_hat, dataset.y)
+        # loss = criterion(y_hat, dataset.y)
+        loss = criterion(y_hat, threshold)
         loss.backward()
         optimizer.step()
         # optimizer.zero_grad()

@@ -73,7 +73,9 @@ class Example1(Helper):
 
         # recourse(model, sub_sample, 10,weight,loss_list=[])
         if len(sub_sample) > 0:
-            recourse(model, sub_sample, 10)
+            # print("sub_sample: ",sub_sample.y)
+            # print("sub_sample.y size: ",sub_sample.y.size())
+            recourse(model, sub_sample, 10,threshold=0.5)
             test = deepcopy(x)
 
             #change the attributes that performed recourse
