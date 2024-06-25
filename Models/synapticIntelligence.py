@@ -16,17 +16,18 @@ class SynapticIntelligence:
             self.omega[name] = pt.zeros_like(param)
             self.param_updates[name] = pt.zeros_like(param)
 
-    def update_omega(self, loader, criterion):
+    def update_omega(self, train: Dataset, criterion):
         self.model.eval()
-        for inputs, labels in loader:
+        for inputs, labels in train:
             self.model.zero_grad()
             outputs = self.model(inputs)
             loss = criterion(outputs, labels)
             loss.backward()
             for name, param in self.model.named_parameters():
                 if param.grad is not None:
-                    print("param.grad.data:", param.grad.data)
-                    self.param_updates[name] += param.grad.data ** 2
+                    # parameter specific contribution to changes in the total loss
+                    # if the updated parameter is important, the gradient w.r.t. it will be large
+                    self.param_updates[name] += param.grad.detach() ** 2
 
     def consolidate(self):
         for name, param in self.model.named_parameters():
@@ -35,7 +36,7 @@ class SynapticIntelligence:
             self.prev_params[name] = param.data.clone()
             self.param_updates[name].zero_()
 
-    def compute_si_loss(self, model, lambda_):
+    def compute_si_loss(self, model: nn.Module, lambda_):
         si_loss = 0
         for name, param in model.named_parameters():
             if name in self.omega:
@@ -46,7 +47,7 @@ class SynapticIntelligence:
 def continual_training(model: nn.Module, si, dataset: Dataset, max_epochs: int, loss_list = None, lambda_ = 0.5):
     loss: pt.Tensor
     criterion = nn.BCELoss()
-    optimizer = optim.Adam(model.parameters(), 0.3)
+    optimizer = optim.Adam(model.parameters(), 0.1)
     model.train()
     for _ in range(max_epochs):
         optimizer.zero_grad()
