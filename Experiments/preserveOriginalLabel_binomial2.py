@@ -11,6 +11,7 @@ from Experiment_Helper.helper import Helper, pca
 from Models.logisticRegression import LogisticRegression, training
 from Models.recourseOriginal import recourse
 from Config.config import train, test, sample, model
+from Config.MLP_config import MLP_model
 from Dataset.makeDataset import Dataset
 
 current_file_path = __file__
@@ -59,35 +60,35 @@ class Example1(Helper):
 
         # print("predict: ",y_prob.data)
         y_pred = y_prob.flatten() < 0.5
-        print("y_pred: ",y_pred)
-        print("~y_pred: ",(~y_pred).float())
+        # print("y_pred: ",y_pred)
+        # print("~y_pred: ",(~y_pred).float())
 
         # Performs recourse on the selected samples with binomial distributed destination.
         binomialData = np.random.binomial(1,BinomialProb,np.count_nonzero(y_pred)).astype(bool)
-        print("binomial data: ",binomialData)
+        # print("binomial data: ",binomialData)
         # y_pred[y_pred == True] = pt.from_numpy(binomialData)
         recourseIndex = deepcopy(y_pred)
-        print("before binomial",recourseIndex)
+        # print("before binomial",recourseIndex)
         recourseIndex[recourseIndex == True] = pt.from_numpy(binomialData)
-        print("binomial y_pred",y_pred)
-        print("binomial recourseIndex",recourseIndex)
+        # print("binomial y_pred",y_pred)
+        # print("binomial recourseIndex",recourseIndex)
         sub_sample = Dataset(x[recourseIndex], pt.full((recourseIndex.count_nonzero(), 1),1.0))
 
-        print("do the recourse")
-        print("len subsample",len(sub_sample))
+        # print("do the recourse")
+        # print("len subsample",len(sub_sample))
         # recourse(model, sub_sample, 10,weight,loss_list=[])
         if len(sub_sample) > 0:
-            recourse(model, sub_sample, 10)
+            recourse(model, sub_sample, 10,threshold=0.9)
 
-            print("sub_sample x:",sub_sample.x)
-            print("sub_sample y:",sub_sample.y)
+            # print("sub_sample x:",sub_sample.x)
+            # print("sub_sample y:",sub_sample.y)
             test = deepcopy(x)
-            print("x : ",test)
+            # print("x : ",test)
 
             x[recourseIndex] = sub_sample.x
 
-            print("after recourse")
-            print("check eq :",pt.eq(test,x))
+            # print("after recourse")
+            # print("check eq :",pt.eq(test,x))
 
         j = np.random.choice(train.x.shape[0], size, False)
         train.x[j] = x
@@ -193,11 +194,11 @@ class Example1(Helper):
 # print(train.x)
 # print(train.y)
 BinomialProb = 0.01
-ex1 = Example1(model, pca, train, test, sample)
+ex1 = Example1(MLP_model, pca, train, test, sample)
 ex1.save_directory = DIRECTORY
 
 ani1 = ex1.animate_all(80)
-ani1.save(os.path.join(DIRECTORY, "ex1.gif"))
+ani1.save(os.path.join(DIRECTORY, "ex1.mp4"))
 
 # ex1.draw_PDt()
 ex1.draw_PDt()

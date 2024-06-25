@@ -17,5 +17,5 @@ plt.plot(loss_list)
 plt.xlabel('Round')
 plt.ylabel('loss')
 plt.title('loss')
-plt.savefig('loss_init.png')
+plt.savefig('logisticRegression_loss_init.png')
 

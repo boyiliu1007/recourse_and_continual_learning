@@ -178,14 +178,14 @@ class Example9(Helper):
 ex9 = Example9(model, pca, train, test, sample)
 ex9.save_directory = DIRECTORY
 # ani1 = ex1.animate_all(240)
-ani9 = ex9.animate_all(40)
+ani9 = ex9.animate_all(80)
 ani9.save(os.path.join(DIRECTORY, "ex9.gif"))
 
 # ex1.draw_PDt()
 ex9.draw_PDt()
-ex9.draw_EFT(40)
-ex9.draw_R20_EFT(40,8)
-ex9.draw_R20_EFT(40,10)
+ex9.draw_EFT(80)
+ex9.draw_R20_EFT(80,10)
+ex9.draw_R20_EFT(80,20)
 
 # ex1.draw_EFT(240)
 # ex1.draw_R20_EFT(240,23)
