@@ -22,7 +22,7 @@ class Recourse(nn.Module):
 
 
 # def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.Tensor | None = None, loss_list: list | None = None):
-def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.Tensor = None, loss_list: list = None,threshold = 1.0):
+def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, loss_list: list = None,threshold = 1.0):
     loss: pt.Tensor
     r_model = Recourse(dataset.x.shape)
     criterion = nn.HuberLoss()
@@ -33,7 +33,7 @@ def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.T
     r_model.train()
     for _ in range(max_epochs):
         optimizer.zero_grad()
-        x_hat = r_model(dataset.x, weight)
+        x_hat = r_model(dataset.x)
         y_hat = c_model(x_hat)
         # loss = criterion(y_hat, dataset.y)
         loss = criterion(y_hat, threshold)
