@@ -95,7 +95,7 @@ class Example9_Continual_Learning(Helper):
         #紀錄新增進來的sample資料
         self.addEFTDataFrame(j)
 
-        continual_training(model, self.si, train, 50, lambda_ = 1)
+        continual_training(model, self.si, train, 50, lambda_ = 0.1)
 
         self.si.update_omega(train, nn.BCELoss())
         self.si.consolidate()
