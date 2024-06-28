@@ -54,7 +54,7 @@ def continual_training(model: nn.Module, si, dataset: Dataset, max_epochs: int, 
         outputs = model(dataset.x)
         loss = criterion(outputs, dataset.y)
         if si is not None:
-            loss += si.compute_si_loss(model, lambda_)
+            loss += si.compute_si_loss(model, lambda_) *  0.005 # 0.005 is a hyperparameter used to scale the SI loss
         loss.backward()
         optimizer.step()
         if loss_list is not None:

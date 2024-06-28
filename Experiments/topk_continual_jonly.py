@@ -76,14 +76,13 @@ class Example9_Continual_Learning(Helper):
         # train.y[]
 
         with pt.no_grad():
-          y_prob_all: pt.Tensor = model(train.x)
+            y_prob_j: pt.Tensor = model(train.x[j])
 
-        sorted_indices = pt.argsort(y_prob_all[:, 0], dim=0, descending=True)
+        sorted_indices = pt.argsort(y_prob_j[:, 0], dim=0, descending=True)
         cutoff_index = len(sorted_indices) // 2
-        print("sorted_indices", sorted_indices)
-        mask = pt.zeros_like(y_prob_all)
+        mask = pt.zeros_like(y_prob_j)
         mask[sorted_indices[:cutoff_index]] = 1
-        train.y = mask.float()
+        train.y[j] = mask.float()
 
         val_data = Dataset(train.x[j], train.y[j])
         self.validation_list.append(val_data)

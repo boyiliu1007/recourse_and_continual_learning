@@ -27,7 +27,7 @@ def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, loss_list: l
     r_model = Recourse(dataset.x.shape)
     criterion = nn.HuberLoss()
     optimizer = optim.Adam(r_model.parameters(), 0.1)
-    threshold = pt.ones(dataset.y.size())
+    threshold = pt.ones(dataset.y.size()).fill_(threshold)
     # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer)
 
     r_model.train()
