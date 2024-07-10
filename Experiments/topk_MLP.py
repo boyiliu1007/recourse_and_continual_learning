@@ -8,10 +8,9 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from Experiment_Helper.helper import Helper, pca
-from Models.logisticRegression import LogisticRegression, training
-from Models.synapticIntelligence import continual_training
+from Models.MLP import MLP, training
 from Models.recourseOriginal import recourse
-from Config.continual_config import train, test, sample, model, si
+from Config.MLP_config import train, test, sample, MLP_model
 from Dataset.makeDataset import Dataset
 
 current_file_path = __file__
@@ -27,7 +26,7 @@ try:
 except Exception as e:
     print(f"An error occurred: {e}")
 
-class Example9_Continual_Learning(Helper):
+class Example9(Helper):
     '''
     Update Method Steps:
     1. Selects a random subset of `sample` with a approximately size of `train.size * 0.02`.
@@ -35,7 +34,6 @@ class Example9_Continual_Learning(Helper):
     3. Replaces a corresponding part of the training set with the updated samples.
     4. Refits the model with the modified training data.
     '''
-    #add first k              k maybe 40% 80% 100%
 
     def update(self, model: nn.Module, train: Dataset, sample: Dataset):
         print("round: ",self.round)
@@ -87,7 +85,7 @@ class Example9_Continual_Learning(Helper):
 
         val_data = Dataset(train.x[j], train.y[j])
         self.validation_list.append(val_data)
-        sample_model = LogisticRegression(val_data.x.shape[1], 1)
+        sample_model = MLP(val_data.x.shape[1], 1)
         sample_model.train()
         training(sample_model, val_data, 30)
         self.Aj_tide_list.append(self.calculate_accuracy(sample_model(val_data.x), val_data.y))
@@ -95,16 +93,14 @@ class Example9_Continual_Learning(Helper):
         #紀錄新增進來的sample資料
         self.addEFTDataFrame(j)
 
-        continual_training(model, self.si, train, 50, lambda_ = 0)
 
-        self.si.update_omega(train, nn.BCELoss())
-        self.si.consolidate()
+        training(model, train, 50)
 
         # calculate the overall accuracy
         self.overall_acc_list.append(self.calculate_AA(model, self.validation_list))
         # evaluate memory stability
         self.memory_stability_list.append(self.calculate_BWT(model, self.validation_list, self.Ajj_performance_list))
-        # evaluate learning plasticity
+        # evaluate memory plasticity
         self.memory_plasticity_list.append(self.calculate_FWT(self.Ajj_performance_list, self.Aj_tide_list))
 
 
@@ -119,7 +115,7 @@ class Example9_Continual_Learning(Helper):
         recourseFailCnt = len(y_prob[y_prob < 0.5])
         # print("recourseFailCnt",recourseFailCnt)
         if len(x[y_pred]) == 0:
-            recourseFailRate = recourseFailCnt / 0.001
+            recourseFailRate = 1
         else:
             recourseFailRate = recourseFailCnt / len(x[y_pred])
         # print("recourseFailRate : ",recourseFailRate)
@@ -177,22 +173,21 @@ class Example9_Continual_Learning(Helper):
 
         self.PDt.append(parameterL2)
 
-weight = pt.from_numpy(np.ones(train.x.shape[1]))
+# weight = pt.from_numpy(np.random.gamma(3,1,20))
 # print(train.x)
 # print(train.y)
-ex9 = Example9_Continual_Learning(model, pca, train, test, sample)
-ex9.si = si
-# ani1 = ex1.animate_all(240)
+ex9 = Example9(MLP_model, pca, train, test, sample)
 ex9.save_directory = DIRECTORY
-ROUNDS = 160
+# ani1 = ex1.animate_all(240)
+ROUNDS = 80
 ani9 = ex9.animate_all(ROUNDS)
-ani9.save(os.path.join(DIRECTORY, "ex9.mp4"))
+ani9.save(os.path.join(DIRECTORY, "ex9.gif"))
 
 # ex1.draw_PDt()
 ex9.draw_PDt()
 ex9.draw_EFT(ROUNDS)
-ex9.draw_R20_EFT(ROUNDS,8)
 ex9.draw_R20_EFT(ROUNDS,10)
+ex9.draw_R20_EFT(ROUNDS,20)
 
 # ex1.draw_EFT(240)
 # ex1.draw_R20_EFT(240,23)
@@ -201,4 +196,3 @@ ex9.draw_R20_EFT(ROUNDS,10)
 ex9.draw_Fail_to_Recourse()
 display(ex9.EFTdataframe)
 ex9.plot_matricsA()
-ex9.plot_Ajj()
