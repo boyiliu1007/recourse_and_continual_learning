@@ -8,7 +8,7 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from Experiment_Helper.helper import Helper, pca
-from Models.logisticRegression import LogisticRegression, training
+from Models.MLP import MLP, training
 from Models.recourseOriginal import recourse
 from Config.config import train, test, sample, model
 from Config.MLP_config import MLP_model
@@ -112,7 +112,7 @@ class Example9(Helper):
 
         val_data = Dataset(train.x[j], train.y[j])
         self.validation_list.append(val_data)
-        sample_model = LogisticRegression(val_data.x.shape[1], 1)
+        sample_model = MLP(val_data.x.shape[1], 1)
         sample_model.train()
         training(sample_model, val_data, 30)
         self.Aj_tide_list.append(self.calculate_accuracy(sample_model(val_data.x), val_data.y))
