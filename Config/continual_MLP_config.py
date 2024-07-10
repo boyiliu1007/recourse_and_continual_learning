@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from Dataset.makeDataset import make_dataset
-from Models.MLP import MLP, training
+from Models.MLP import MLP
 from Models.synapticIntelligence import SynapticIntelligence, continual_training
 
 train, test, sample = make_dataset(100, 100, 2000)
