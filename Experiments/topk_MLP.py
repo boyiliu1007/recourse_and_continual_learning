@@ -66,7 +66,8 @@ class Example9(Helper):
 
         j = np.random.choice(train.x.shape[0], size, False)
         train.x[j] = x
-        train.y[j, 0] = (~y_pred).float()
+        with pt.no_grad():
+            train.y[j, 0] = (model(x).flatten() > 0.5).float()
 
         # index = y_prob.flatten() > 0.5
         # k = round(len(index) * 0.4)

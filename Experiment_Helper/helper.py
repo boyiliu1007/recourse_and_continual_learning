@@ -52,6 +52,8 @@ class Helper:
                 'EFTList': [[] for _ in range(len(train.x))]
             }
         )
+        self.failToRecourseOnModel = []
+        self.failToRecourseOnLabel = []
         self.failToRecourse = []
 
         self.validation_list = []
@@ -399,6 +401,22 @@ class Helper:
         plt.ylabel('Fail_to_Recourse')
         plt.title('FtR during Rounds')
         plt.savefig(os.path.join(self.save_directory, 'Fail_to_Recourse.png'))
+
+    def draw_Fail_to_Recourse_on_Model(self):
+        plt.figure()
+        plt.plot(self.failToRecourseOnModel)
+        plt.xlabel('Round')
+        plt.ylabel('Fail_to_Recourse_on_Model')
+        plt.title('FtR during Rounds')
+        plt.savefig(os.path.join(self.save_directory, 'Fail_to_Recourse_on_Model.png'))
+
+    def draw_Fail_to_Recourse_on_Label(self):
+        plt.figure()
+        plt.plot(self.failToRecourseOnLabel)
+        plt.xlabel('Round')
+        plt.ylabel('Fail_to_Recourse_on_Label')
+        plt.title('FtR during Rounds')
+        plt.savefig(os.path.join(self.save_directory, 'Fail_to_Recourse_on_Label.png'))
 
     #紀錄新增進來的sample資料
     def addEFTDataFrame(self,index):

@@ -68,7 +68,8 @@ class Example9_Continual_Learning(Helper):
 
         j = np.random.choice(train.x.shape[0], size, False)
         train.x[j] = x
-        train.y[j, 0] = (~y_pred).float()
+        with pt.no_grad():
+            train.y[j, 0] = (model(x).flatten() > 0.5).float()
 
         # index = y_prob.flatten() > 0.5
         # k = round(len(index) * 0.4)
@@ -95,7 +96,7 @@ class Example9_Continual_Learning(Helper):
         #紀錄新增進來的sample資料
         self.addEFTDataFrame(j)
 
-        continual_training(model, self.si, train, 50, lambda_ = 0)
+        continual_training(model, self.si, train, 50, lambda_ = 0.1)
 
         self.si.update_omega(train, nn.BCELoss())
         self.si.consolidate()
@@ -177,7 +178,7 @@ class Example9_Continual_Learning(Helper):
 
         self.PDt.append(parameterL2)
 
-weight = pt.from_numpy(np.random.gamma(0.3,1,train.x.shape[1]))
+weight = pt.from_numpy(np.random.gamma(0.1,1,train.x.shape[1]))
 # print(train.x)
 # print(train.y)
 ex9 = Example9_Continual_Learning(model, pca, train, test, sample)

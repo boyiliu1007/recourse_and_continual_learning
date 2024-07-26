@@ -58,7 +58,7 @@ class Example9_Continual_Learning(Helper):
 
         # print("predict: ",y_prob.data)
         y_pred = y_prob.flatten() < 0.5
-        print("~y_pred : ",y_pred)
+        # print("~y_pred : ",y_pred)
         sub_sample = Dataset(x[y_pred], pt.ones((y_pred.count_nonzero(), 1)))
 
         # recourse(model, sub_sample, 10,weight,loss_list=[])
@@ -68,22 +68,57 @@ class Example9_Continual_Learning(Helper):
 
         j = np.random.choice(train.x.shape[0], size, False)
         train.x[j] = x
-        train.y[j, 0] = (~y_pred).float()
+        with pt.no_grad():
+            train.y[j, 0] = (model(x).flatten() > 0.5).float()
+        print("train.y[j, 0] : ",train.y[j, 0])
+        with pt.no_grad():
+            tensor_list = model(train.x[j]).tolist()
+            # Format the numbers to float
+            formatted_list = [[float(f"{num:.6f}") for num in sublist] for sublist in tensor_list]
+            # Print the formatted list
+            for sublist in formatted_list:
+                print(sublist)
 
         # index = y_prob.flatten() > 0.5
         # k = round(len(index) * 0.4)
         # index = y_prob[index].numpy().argpartition(k)
         # train.y[]
 
+
+        # fail to recourse on Label
+        with pt.no_grad():
+            y_prob_l: pt.Tensor = model(x[y_pred])
+
+        # print("x[y_pred] : ",x[y_pred])
+        # print("after model update:")
+        # print("y_prob:",y_prob)
+        # print("y_prob[y_prob < 0.5]",y_prob[y_prob < 0.5])
+        recourseFailCnt = len(y_prob_l[y_prob_l < 0.5])
+        print("recourseFailCnt",recourseFailCnt, "len(x[y_pred])",len(x[y_pred]))
+        if len(x[y_pred]) == 0:
+            recourseFailRate = -1
+        else:
+            recourseFailRate = recourseFailCnt / len(x[y_pred])
+        # print("recourseFailRate : ",recourseFailRate)
+        self.failToRecourseOnLabel.append(recourseFailRate)
+
         with pt.no_grad():
           y_prob_all: pt.Tensor = model(train.x)
 
+        # top 50% 
+        y_copy = train.y.clone().detach().squeeze()
         sorted_indices = pt.argsort(y_prob_all[:, 0], dim=0, descending=True)
         cutoff_index = len(sorted_indices) // 2
-        print("sorted_indices", sorted_indices)
+        # print("sorted_indices", sorted_indices)
         mask = pt.zeros_like(y_prob_all)
         mask[sorted_indices[:cutoff_index]] = 1
         train.y = mask.float()
+        print("y_copy",y_copy)
+        print("train.y",train.y.clone().detach().squeeze())
+        if (y_copy == train.y.clone().detach().squeeze()).all():
+            print("y_copy == train.y")
+        else:
+            print("y_copy != train.y")
 
         val_data = Dataset(train.x[j], train.y[j])
         self.validation_list.append(val_data)
@@ -95,7 +130,7 @@ class Example9_Continual_Learning(Helper):
         #紀錄新增進來的sample資料
         self.addEFTDataFrame(j)
 
-        continual_training(model, self.si, train, 50, lambda_ = 0)
+        continual_training(model, self.si, train, 50, lambda_ = 0.001)
 
         self.si.update_omega(train, nn.BCELoss())
         self.si.consolidate()
@@ -108,7 +143,7 @@ class Example9_Continual_Learning(Helper):
         self.memory_plasticity_list.append(self.calculate_FWT(self.Ajj_performance_list, self.Aj_tide_list))
 
 
-        #紀錄Fail_to_Recourse
+        #紀錄Fail_to_Recourse on Model
         with pt.no_grad():
             y_prob: pt.Tensor = model(x[y_pred])
 
@@ -119,11 +154,11 @@ class Example9_Continual_Learning(Helper):
         recourseFailCnt = len(y_prob[y_prob < 0.5])
         # print("recourseFailCnt",recourseFailCnt)
         if len(x[y_pred]) == 0:
-            recourseFailRate = recourseFailCnt / 0.001
+            recourseFailRate = -1
         else:
             recourseFailRate = recourseFailCnt / len(x[y_pred])
         # print("recourseFailRate : ",recourseFailRate)
-        self.failToRecourse.append(recourseFailRate)
+        self.failToRecourseOnModel.append(recourseFailRate)
 
         self.EFTdataframe = self.EFTdataframe.assign(updateRounds = self.EFTdataframe['updateRounds'] + 1)
         self.round = self.round + 1
@@ -198,7 +233,8 @@ ex9.draw_R20_EFT(ROUNDS,10)
 # ex1.draw_R20_EFT(240,23)
 # ex1.draw_R20_EFT(240,40)
 # ex1.draw_R20_EFT(240,58)
-ex9.draw_Fail_to_Recourse()
+ex9.draw_Fail_to_Recourse_on_Model()
+ex9.draw_Fail_to_Recourse_on_Label()
 display(ex9.EFTdataframe)
 ex9.plot_matricsA()
 ex9.plot_Ajj()
