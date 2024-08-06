@@ -29,14 +29,16 @@ def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, loss_list: l
     optimizer = optim.Adam(r_model.parameters(), 0.1)
     threshold = pt.ones(dataset.y.size()).fill_(threshold)
     # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+    print("threshold : ",threshold)
 
     r_model.train()
     for _ in range(max_epochs):
-        optimizer.zero_grad()
+        # optimizer.zero_grad()
         x_hat = r_model(dataset.x)
         y_hat = c_model(x_hat)
         # loss = criterion(y_hat, dataset.y)
         loss = criterion(y_hat, threshold)
+        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         # optimizer.zero_grad()

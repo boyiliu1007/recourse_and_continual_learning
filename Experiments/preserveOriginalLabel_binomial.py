@@ -76,7 +76,7 @@ class Example1(Helper):
         if len(sub_sample) > 0:
             # print("sub_sample: ",sub_sample.y)
             # print("sub_sample.y size: ",sub_sample.y.size())
-            recourse(model, sub_sample, 10,threshold=0.9)
+            recourse(model, sub_sample, 10,threshold=0.5)
             test = deepcopy(x)
 
             #change the attributes that performed recourse

@@ -54,7 +54,7 @@ class Example6(Helper):
         y_pred = y_prob.flatten() < 0.5
         sub_sample = Dataset(x[y_pred], pt.full((y_pred.count_nonzero(), 1), 0.6))
         # print("weights: ",weight)
-        recourse(model, sub_sample, 80, weight,loss_list=[])
+        recourse(model, sub_sample, 200, weight,loss_list=[])
 
         x[y_pred] = sub_sample.x
 
@@ -157,7 +157,7 @@ class Example6(Helper):
         self.PDt.append(parameterL2)
 
 
-weight = pt.from_numpy(np.random.gamma(0.3,1,train.x.shape[1]))
+weight = pt.from_numpy(np.random.gamma(0.1,1,train.x.shape[1]))
 print("outside: ",weight)
 # print("train.x:",train.x.shape)
 # pt.randn(train.x.shape[1])
