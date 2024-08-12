@@ -27,12 +27,14 @@ class Dataset(data.Dataset):
         return f'{type(self)}({self.x.shape})'
 
 
-def make_dataset(train: int, test: int, sample: int):
+def make_dataset(train: int, test: int, sample: int, positive_ratio: float = 0.5):
     n_samples = train + test + sample
 
     #generate dataset with n_sameples data and 20 features
-    x, y = make_classification(n_samples, random_state=42)
+    x, y = make_classification(n_samples, weights=[1 - positive_ratio, positive_ratio], random_state=42)
     print(x.shape)
+    actual_positive_samples = np.sum(y == 1)
+    print(f"Number of positive samples: {actual_positive_samples / n_samples}")
 
     x = pt.tensor(x, dtype=pt.float)
     #do the transpose

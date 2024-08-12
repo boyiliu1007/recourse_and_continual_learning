@@ -11,7 +11,7 @@ from Experiment_Helper.helper import Helper, pca
 from Models.logisticRegression import LogisticRegression, training
 from Models.synapticIntelligence import continual_training
 from Models.recourseOriginal import recourse
-from Config.continual_config import train, test, sample, model, si
+from Config.continual_config import train, test, sample, model, si, POSITIVE_RATIO
 from Dataset.makeDataset import Dataset
 
 current_file_path = __file__
@@ -108,7 +108,7 @@ class Example9_Continual_Learning(Helper):
         # top 50% 
         y_copy = train.y.clone().detach().squeeze()
         sorted_indices = pt.argsort(y_prob_all[:, 0], dim=0, descending=True)
-        cutoff_index = len(sorted_indices) // 2
+        cutoff_index = int(len(sorted_indices) * POSITIVE_RATIO)
         # print("sorted_indices", sorted_indices)
         mask = pt.zeros_like(y_prob_all)
         mask[sorted_indices[:cutoff_index]] = 1
@@ -130,7 +130,7 @@ class Example9_Continual_Learning(Helper):
         #紀錄新增進來的sample資料
         self.addEFTDataFrame(j)
 
-        continual_training(model, self.si, train, 50, lambda_ = 0.001)
+        continual_training(model, self.si, train, 50, lambda_ = 0.01)
 
         self.si.update_omega(train, nn.BCELoss())
         self.si.consolidate()
@@ -154,7 +154,7 @@ class Example9_Continual_Learning(Helper):
         recourseFailCnt = len(y_prob[y_prob < 0.5])
         # print("recourseFailCnt",recourseFailCnt)
         if len(x[y_pred]) == 0:
-            recourseFailRate = -1
+            recourseFailRate = 0
         else:
             recourseFailRate = recourseFailCnt / len(x[y_pred])
         # print("recourseFailRate : ",recourseFailRate)
