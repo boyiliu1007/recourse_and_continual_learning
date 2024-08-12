@@ -10,7 +10,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from Experiment_Helper.helper import Helper, pca
 from Models.MLP import MLP, training
 from Models.recourseOriginal import recourse
-from Config.MLP_config import train, test, sample, MLP_model
+from Config.MLP_config import train, test, sample, MLP_model, POSITIVE_RATIO
 from Dataset.makeDataset import Dataset
 
 current_file_path = __file__
@@ -78,7 +78,7 @@ class Example9(Helper):
           y_prob_all: pt.Tensor = model(train.x)
 
         sorted_indices = pt.argsort(y_prob_all[:, 0], dim=0, descending=True)
-        cutoff_index = len(sorted_indices) // 2
+        cutoff_index = int(len(sorted_indices) * POSITIVE_RATIO)
         print("sorted_indices", sorted_indices)
         mask = pt.zeros_like(y_prob_all)
         mask[sorted_indices[:cutoff_index]] = 1
