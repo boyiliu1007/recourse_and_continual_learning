@@ -11,7 +11,7 @@ from Experiment_Helper.helper import Helper, pca
 from Models.logisticRegression import LogisticRegression, training
 from Models.synapticIntelligence import continual_training
 from Models.recourseGradient import recourse
-from Config.continual_config import train, test, sample, model, si
+from Config.continual_config import train, test, sample, model, si, POSITIVE_RATIO
 from Dataset.makeDataset import Dataset
 
 current_file_path = __file__
@@ -80,7 +80,7 @@ class Example9_Continual_Learning(Helper):
           y_prob_all: pt.Tensor = model(train.x)
 
         sorted_indices = pt.argsort(y_prob_all[:, 0], dim=0, descending=True)
-        cutoff_index = len(sorted_indices) // 2
+        cutoff_index = int(len(sorted_indices) * POSITIVE_RATIO)
         print("sorted_indices", sorted_indices)
         mask = pt.zeros_like(y_prob_all)
         mask[sorted_indices[:cutoff_index]] = 1
