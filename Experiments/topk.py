@@ -18,6 +18,7 @@ current_directory = os.path.dirname(current_file_path)
 current_file_name = os.path.basename(current_file_path)
 current_file_name = os.path.splitext(current_file_name)[0]
 
+
 DIRECTORY = os.path.join(current_directory, f"{current_file_name}_output")
 
 try:
