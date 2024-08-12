@@ -8,7 +8,8 @@ from Dataset.makeDataset import make_dataset
 from Models.MLP import MLP
 from Models.synapticIntelligence import SynapticIntelligence, continual_training
 
-train, test, sample = make_dataset(100, 100, 2000)
+POSITIVE_RATIO = 0.25
+train, test, sample = make_dataset(100, 100, 2000, POSITIVE_RATIO)
 model = MLP(train.x.shape[1], 1)
 loss_list = []
 criterion = nn.BCELoss()
