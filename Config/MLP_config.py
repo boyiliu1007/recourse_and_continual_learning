@@ -6,7 +6,7 @@ from Dataset.makeDataset import make_dataset
 from Models.MLP import MLP
 from Models.MLP import training
 
-POSITIVE_RATIO = 0.25
+POSITIVE_RATIO = 0.5
 train, test, sample = make_dataset(100, 100, 2000, POSITIVE_RATIO)
 print(train.x.shape)
 MLP_model = MLP(train.x.shape[1], 1)

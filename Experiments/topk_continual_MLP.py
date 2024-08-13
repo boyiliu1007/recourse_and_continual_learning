@@ -4,6 +4,8 @@ from copy import deepcopy
 import numpy as np
 from IPython.display import display
 
+import csv
+import pandas as pd
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -20,6 +22,7 @@ current_file_name = os.path.basename(current_file_path)
 current_file_name = os.path.splitext(current_file_name)[0]
 
 DIRECTORY = os.path.join(current_directory, f"{current_file_name}_output")
+RESULT_DIR = f"Result\{current_file_name}.csv"
 
 try:
     os.makedirs(DIRECTORY, exist_ok=True)
@@ -96,7 +99,7 @@ class Example9_Continual_Learning(Helper):
         #紀錄新增進來的sample資料
         self.addEFTDataFrame(j)
 
-        continual_training(model, self.si, train, 50, lambda_ = 0)
+        continual_training(model, self.si, train, 50, lambda_ = 0.01)
 
         self.si.update_omega(train, nn.BCELoss())
         self.si.consolidate()
@@ -203,3 +206,18 @@ ex9.draw_Fail_to_Recourse()
 display(ex9.EFTdataframe)
 ex9.plot_matricsA()
 ex9.plot_Ajj()
+
+column_name = f'{current_file_name}_k-{POSITIVE_RATIO}'
+if os.path.exists(RESULT_DIR):
+    # Read the existing CSV file
+    df = pd.read_csv(RESULT_DIR)
+
+    # Append the new column (if it doesn't already exist)
+    df[column_name] = ex9.failToRecourse
+
+else:
+    # Create a new DataFrame with the new column
+    df = pd.DataFrame({column_name: ex9.failToRecourse})
+
+# Save the DataFrame back to the CSV file
+df.to_csv(RESULT_DIR, index=False)

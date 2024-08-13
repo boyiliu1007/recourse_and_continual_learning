@@ -6,7 +6,7 @@ from Dataset.makeDataset import make_dataset
 from Models.logisticRegression import LogisticRegression
 from Models.logisticRegression import training
 
-POSITIVE_RATIO = 0.75
+POSITIVE_RATIO = 0.25
 train, test, sample = make_dataset(100, 100, 2000, POSITIVE_RATIO)
 print(train.x.shape)
 model = LogisticRegression(train.x.shape[1], 1)
