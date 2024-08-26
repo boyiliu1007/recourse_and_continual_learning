@@ -9,7 +9,7 @@ from Models.logisticRegression import LogisticRegression
 from Models.logisticRegression import training
 from Models.synapticIntelligence import SynapticIntelligence, continual_training
 
-POSITIVE_RATIO = 0.75
+POSITIVE_RATIO = 0.5
 train, test, sample = make_dataset(100, 100, 2000, POSITIVE_RATIO)
 model = LogisticRegression(train.x.shape[1], 1)
 loss_list = []

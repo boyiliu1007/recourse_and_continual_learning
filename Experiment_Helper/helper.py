@@ -540,9 +540,9 @@ class Helper:
       axs[1].set_ylabel('memory stability')
 
       axs[2].plot(self.memory_plasticity_list)
-      axs[2].set_title('memory plasticity')
+      axs[2].set_title('learning plasticity')
       axs[2].set_xlabel('Round')
-      axs[2].set_ylabel('memory plasticity')
+      axs[2].set_ylabel('learning plasticity')
 
       # Adjust layout
       plt.tight_layout()

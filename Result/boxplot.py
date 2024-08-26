@@ -8,9 +8,14 @@ import textwrap
 def draw(all = False):
     if not all:
         # Step 1: Read the CSV file
-        file_path = 'Result/topk_MLP.csv'
+        file_path = 'Result/topk_continual.csv'
         df = pd.read_csv(file_path)
 
+        labels = []
+        for column in df.columns:
+            labels.append(column.replace('_', '_\n'))
+        
+        df.columns = labels
         # Step 2: Plot the Box Plot for all columns
         sns.boxplot(data=df)
 
@@ -20,7 +25,9 @@ def draw(all = False):
         plt.ylabel('Fail to Recourse Percentage')
 
         # Show the plot
+        plt.savefig('Result/boxplot.png')
         plt.show()
+        
     
     else:
         csv_files = glob.glob('Result/*.csv')
@@ -44,10 +51,11 @@ def draw(all = False):
         # Add title and labels
         plt.title('Box Plot')
         plt.xlabel('Experiments')
-        plt.ylabel('Fail to Recourse Percentage')
+        plt.ylabel('Fail to Recourse Ratio')
 
         # Show the plot
-        plt.show()
         plt.savefig('Result/boxplot.png')
+        plt.show()
+        
 
-draw(all = True)
+draw()

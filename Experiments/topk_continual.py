@@ -16,6 +16,8 @@ from Models.recourseOriginal import recourse
 from Config.continual_config import train, test, sample, model, si, POSITIVE_RATIO
 from Dataset.makeDataset import Dataset
 
+LAMBDA = 0.001
+
 current_file_path = __file__
 current_directory = os.path.dirname(current_file_path)
 current_file_name = os.path.basename(current_file_path)
@@ -38,7 +40,6 @@ class Example9_Continual_Learning(Helper):
     3. Replaces a corresponding part of the training set with the updated samples.
     4. Refits the model with the modified training data.
     '''
-    #add first k              k maybe 40% 80% 100%
 
     def update(self, model: nn.Module, train: Dataset, sample: Dataset):
         print("round: ",self.round)
@@ -133,7 +134,7 @@ class Example9_Continual_Learning(Helper):
         #紀錄新增進來的sample資料
         self.addEFTDataFrame(j)
 
-        continual_training(model, self.si, train, 50, lambda_ = 0.01)
+        continual_training(model, self.si, train, 50, lambda_ = LAMBDA)
 
         self.si.update_omega(train, nn.BCELoss())
         self.si.consolidate()
@@ -224,7 +225,7 @@ ex9.si = si
 ex9.save_directory = DIRECTORY
 ROUNDS = 160
 ani9 = ex9.animate_all(ROUNDS)
-ani9.save(os.path.join(DIRECTORY, "ex9.mp4"))
+ani9.save(os.path.join(DIRECTORY, "ex9.gif"))
 
 # ex1.draw_PDt()
 ex9.draw_PDt()
@@ -242,7 +243,7 @@ display(ex9.EFTdataframe)
 ex9.plot_matricsA()
 ex9.plot_Ajj()
 
-column_name = f'{current_file_name}_k-{POSITIVE_RATIO}'
+column_name = f'{current_file_name}_k-{POSITIVE_RATIO}_c-{LAMBDA}'
 if os.path.exists(RESULT_DIR):
     # Read the existing CSV file
     df = pd.read_csv(RESULT_DIR)
