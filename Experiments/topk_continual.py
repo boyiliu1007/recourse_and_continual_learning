@@ -225,7 +225,7 @@ ex9.si = si
 ex9.save_directory = DIRECTORY
 ROUNDS = 160
 ani9 = ex9.animate_all(ROUNDS)
-ani9.save(os.path.join(DIRECTORY, "ex9.gif"))
+ani9.save(os.path.join(DIRECTORY, "ex9.mp4"))
 
 # ex1.draw_PDt()
 ex9.draw_PDt()
@@ -242,6 +242,7 @@ ex9.draw_Fail_to_Recourse_on_Label()
 display(ex9.EFTdataframe)
 ex9.plot_matricsA()
 ex9.plot_Ajj()
+ex9.plot_jsd()
 
 column_name = f'{current_file_name}_k-{POSITIVE_RATIO}_c-{LAMBDA}'
 if os.path.exists(RESULT_DIR):

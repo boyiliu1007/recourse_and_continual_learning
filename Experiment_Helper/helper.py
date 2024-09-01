@@ -17,6 +17,8 @@ from torch.utils.data import Dataset
 from copy import deepcopy
 import numpy as np
 from numpy.typing import NDArray
+from sklearn.neighbors import KernelDensity
+from scipy.spatial.distance import jensenshannon
 
 import os
 import sys
@@ -62,6 +64,7 @@ class Helper:
         self.memory_stability_list = []
         self.memory_plasticity_list = []
         self.Aj_tide_list = []
+        self.jsd_list = []
 
         self._hist: list[BarContainer]
         self._bins: NDArray
@@ -121,6 +124,28 @@ class Helper:
                     fontsize='xx-small'
                 )
         return fig, ax
+
+    #calculate js divergence using training data after pca
+    def js_divergence(self, pcaData, labelData):
+        data1 = pcaData[labelData.flatten() == 0]
+        data2 = pcaData[labelData.flatten() == 1]
+
+        # Fit KDEs to the reduced data
+        kde1 = KernelDensity(kernel='gaussian', bandwidth=1).fit(data1)
+        kde2 = KernelDensity(kernel='gaussian', bandwidth=1).fit(data2)
+
+        # Evaluate KDEs on a grid of points
+        grid_points = np.random.randn(1000, 2)  # 1000 points in 2D space
+        log_dens1 = kde1.score_samples(grid_points)
+        log_dens2 = kde2.score_samples(grid_points)
+
+        # Convert to densities
+        dens1 = np.exp(log_dens1)
+        dens2 = np.exp(log_dens2)
+
+        js_divergence = jensenshannon(dens1, dens2)
+        print("js_divergence: ",js_divergence)
+        self.jsd_list.append(js_divergence)
 
     # def draw_dataset_scatter(self, axes: tuple[Axes, Axes] | None = None):
     def draw_dataset_scatter(self, axes: [Axes, Axes] = None):
@@ -242,6 +267,9 @@ class Helper:
 
             self._sc_train.set_offsets(pca.transform(train.x))
             self._sc_train.set_array(train.y.flatten())
+
+            # calculate js divergence of pca training data
+            self.js_divergence(self._sc_train.get_offsets(), self._sc_train.get_array())
             self._sc_test.set_array(y_pred)
 
             ax1.relim()
@@ -558,5 +586,15 @@ class Helper:
       plt.title('Ajj accuracy')
       plt.savefig(os.path.join(self.save_directory, 'Ajj.png'))
 
+    def plot_jsd(self):
+      plt.figure()
+      plt.plot(self.jsd_list)
+      plt.xlabel('Round')
+      plt.ylabel('js divergence')
+      plt.title('js divergence')
+      plt.savefig(os.path.join(self.save_directory, 'jsd.png'))
+
     def update(self, model: nn.Module, train: Dataset, sample: Dataset):
         raise NotImplementedError()
+    
+    
