@@ -51,7 +51,6 @@ class Example9(Helper):
         # print(modelParams)
         # print(weights,bias)
 
-
         size = train.x.shape[0] // 10
         i = np.random.choice(sample.x.shape[0], size, False)
         x = sample.x[i]
@@ -187,7 +186,7 @@ ex9 = Example9(model, pca, train, test, sample)
 ex9.save_directory = DIRECTORY
 # ani1 = ex1.animate_all(240)
 ani9 = ex9.animate_all(80)
-ani9.save(os.path.join(DIRECTORY, "ex9.gif"))
+ani9.save(os.path.join(DIRECTORY, "ex9.mp4"))
 
 # ex1.draw_PDt()
 ex9.draw_PDt()
@@ -202,7 +201,7 @@ ex9.draw_R20_EFT(80,20)
 ex9.draw_Fail_to_Recourse()
 display(ex9.EFTdataframe)
 ex9.plot_matricsA()
-
+ex9.plot_jsd()
 
 column_name = f'{current_file_name}_k-{POSITIVE_RATIO}'
 if os.path.exists(RESULT_DIR):
