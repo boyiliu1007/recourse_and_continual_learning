@@ -1,0 +1,1 @@
+weight = pt.from_numpy(np.ones(train.x.shape[1])) / train.x.shape[1]

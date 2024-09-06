@@ -76,7 +76,7 @@ class Example1(Helper):
         if len(sub_sample) > 0:
             # print("sub_sample: ",sub_sample.y)
             # print("sub_sample.y size: ",sub_sample.y.size())
-            recourse(model, sub_sample, 10,threshold=0.5)
+            recourse(model, sub_sample, 10,threshold=0.9)
             test = deepcopy(x)
 
             #change the attributes that performed recourse
@@ -206,7 +206,7 @@ class Example1(Helper):
 # print(train.x)
 # print(train.y)
 BinomialProb = 0.7
-ex1 = Example1(MLP_model, pca, train, test, sample)
+ex1 = Example1(model, pca, train, test, sample)
 ex1.save_directory = DIRECTORY
 # ani1 = ex1.animate_all(80)
 

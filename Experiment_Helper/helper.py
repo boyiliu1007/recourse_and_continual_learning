@@ -37,6 +37,9 @@ class Helper:
         self.train = train
         self.test = test
         self.sample = sample
+        self.avgRecourseCost_list=[]
+        self.fairRatio=[]
+        self.q3RecourseCost=[]
         self.PDt = []
         self.round = 0
         self.EFTdataframe =  pd.DataFrame(
@@ -557,6 +560,31 @@ class Helper:
       plt.ylabel('Ajj accuracy')
       plt.title('Ajj accuracy')
       plt.savefig(os.path.join(self.save_directory, 'Ajj.png'))
+      
+    def draw_avgRecourseCost(self):
+        if len(self.avgRecourseCost_list) > 0:
+            plt.figure()
+            plt.plot(self.avgRecourseCost_list)
+            plt.xlabel('Round')
+            plt.ylabel('avgRecourseCost')
+            plt.title('avgRecourseCost')
+            plt.savefig(os.path.join(self.save_directory, 'avgRecourseCost.png'))
+            
+    def draw_testDataFairRatio(self):
+        plt.figure()
+        plt.plot(self.fairRatio)
+        plt.xlabel('Round')
+        plt.ylabel('fair_ratio')
+        plt.title('testDataLabelConsistency')
+        plt.savefig(os.path.join(self.save_directory, 'testDataLabelConsistency.png'))
+        
+    def draw_q3RecourseCost(self):
+        plt.figure()
+        plt.plot(self.q3RecourseCost)
+        plt.xlabel('Round')
+        plt.ylabel('Recourse_Cost')
+        plt.title('Q3_Recourse_Cost')
+        plt.savefig(os.path.join(self.save_directory, 'Q3RecourseCost.png'))
 
     def update(self, model: nn.Module, train: Dataset, sample: Dataset):
         raise NotImplementedError()

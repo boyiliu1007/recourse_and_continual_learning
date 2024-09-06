@@ -78,7 +78,7 @@ class Example1(Helper):
         # print("len subsample",len(sub_sample))
         # recourse(model, sub_sample, 10,weight,loss_list=[])
         if len(sub_sample) > 0:
-            recourse(model, sub_sample, 10,threshold=0.9)
+            recourse(model, sub_sample, 120,threshold=0.9)
 
             # print("sub_sample x:",sub_sample.x)
             # print("sub_sample y:",sub_sample.y)
@@ -193,19 +193,25 @@ class Example1(Helper):
 # weight = pt.from_numpy(np.random.gamma(3,1,20))
 # print(train.x)
 # print(train.y)
-BinomialProb = 0.01
+BinomialProb = 0.9
 ex1 = Example1(MLP_model, pca, train, test, sample)
 ex1.save_directory = DIRECTORY
 
-ani1 = ex1.animate_all(80)
+# ani1 = ex1.animate_all(80)        
+ani1 = ex1.animate_all(200)
 ani1.save(os.path.join(DIRECTORY, "ex1.mp4"))
 
 # ex1.draw_PDt()
 ex1.draw_PDt()
-ex1.draw_EFT(80)
-ex1.draw_R20_EFT(80,10)
-ex1.draw_R20_EFT(80,20)
+# ex1.draw_EFT(80)
+# ex1.draw_R20_EFT(80,10)
+# ex1.draw_R20_EFT(80,20)
 # ex1.draw_R20_EFT(80,58)
+
+ex1.draw_EFT(200)
+ex1.draw_R20_EFT(200,40)
+ex1.draw_R20_EFT(200,60)
+
 ex1.draw_Fail_to_Recourse()
 display(ex1.EFTdataframe)
 ex1.plot_matricsA()

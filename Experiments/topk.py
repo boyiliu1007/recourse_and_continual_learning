@@ -62,7 +62,7 @@ class Example9(Helper):
         sub_sample = Dataset(x[y_pred], pt.ones((y_pred.count_nonzero(), 1)))
 
         # recourse(model, sub_sample, 10,weight,loss_list=[])
-        recourse(model, sub_sample, 10)
+        recourse(model, sub_sample, 10,threshold=0.5)
 
         x[y_pred] = sub_sample.x
 
@@ -81,7 +81,7 @@ class Example9(Helper):
 
         sorted_indices = pt.argsort(y_prob_all[:, 0], dim=0, descending=True)
         cutoff_index = len(sorted_indices) // 2
-        print("sorted_indices", sorted_indices)
+        # print("sorted_indices", sorted_indices)
         mask = pt.zeros_like(y_prob_all)
         mask[sorted_indices[:cutoff_index]] = 1
         train.y = mask.float()

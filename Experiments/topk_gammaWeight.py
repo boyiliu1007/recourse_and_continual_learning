@@ -58,11 +58,11 @@ class Example9(Helper):
 
         # print("predict: ",y_prob.data)
         y_pred = y_prob.flatten() < 0.5
-        print("~y_pred : ",y_pred)
+        # print("~y_pred : ",y_pred)
         sub_sample = Dataset(x[y_pred], pt.ones((y_pred.count_nonzero(), 1)))
 
         # recourse(model, sub_sample, 10,weight,loss_list=[])
-        recourse(model, sub_sample, 80, weight,loss_list=[])
+        recourse(model, sub_sample, 120, weight,loss_list=[],threshold=0.9,cost_list=self.avgRecourseCost_list)
 
         x[y_pred] = sub_sample.x
 
@@ -80,7 +80,7 @@ class Example9(Helper):
 
         sorted_indices = pt.argsort(y_prob_all[:, 0], dim=0, descending=True)
         cutoff_index = len(sorted_indices) // 2
-        print("sorted_indices", sorted_indices)
+        # print("sorted_indices", sorted_indices)
         mask = pt.zeros_like(y_prob_all)
         mask[sorted_indices[:cutoff_index]] = 1
         train.y = mask.float()
@@ -172,8 +172,13 @@ class Example9(Helper):
 
         self.PDt.append(parameterL2)
 
+# cost = []
 weight = pt.from_numpy(np.random.gamma(0.1,1,train.x.shape[1]))
-print("outside: ",weight)
+print("weight: ",weight)
+print("weight sum: ",pt.sum(weight))
+weight /= pt.sum(weight)
+print("weight: ",weight)
+
 # weight = pt.from_numpy(np.random.gamma(3,1,20))
 # print(train.x)
 # print(train.y)
@@ -183,11 +188,17 @@ ex9.save_directory = DIRECTORY
 ani9 = ex9.animate_all(80)
 ani9.save(os.path.join(DIRECTORY, "ex9.gif"))
 
+# print("cost len:",len(cost))
+# if len(cost) > 0:
+#     avgRecourseCost = sum(cost) / len(cost)
+#     print("avgRecourseCost:",avgRecourseCost)
+
 # ex1.draw_PDt()
 ex9.draw_PDt()
 ex9.draw_EFT(80)
 ex9.draw_R20_EFT(80,10)
 ex9.draw_R20_EFT(80,20)
+ex9.draw_avgRecourseCost()
 
 # ex1.draw_EFT(240)
 # ex1.draw_R20_EFT(240,23)

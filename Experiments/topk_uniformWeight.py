@@ -62,7 +62,7 @@ class Example9(Helper):
         sub_sample = Dataset(x[y_pred], pt.ones((y_pred.count_nonzero(), 1)))
 
         # recourse(model, sub_sample, 10,weight,loss_list=[])
-        recourse(model, sub_sample, 80, weight,loss_list=[])
+        recourse(model, sub_sample, 200, weight,loss_list=[],threshold=0.5,cost_list=self.avgRecourseCost_list,q3RecourseCost=self.q3RecourseCost)
 
         x[y_pred] = sub_sample.x
 
@@ -80,7 +80,7 @@ class Example9(Helper):
 
         sorted_indices = pt.argsort(y_prob_all[:, 0], dim=0, descending=True)
         cutoff_index = len(sorted_indices) // 2
-        print("sorted_indices", sorted_indices)
+        # print("sorted_indices", sorted_indices)
         mask = pt.zeros_like(y_prob_all)
         mask[sorted_indices[:cutoff_index]] = 1
         train.y = mask.float()
@@ -97,7 +97,19 @@ class Example9(Helper):
 
 
         training(model, train, 50)
-
+        
+        #Calculate the proportion of test data labels that remain consistent in the new round of labeling.   
+        with pt.no_grad():
+          y_test: pt.Tensor = model(self.test.x)
+        test_trueLabelIdx = test.y.flatten() > 0.5
+        #在test data中label為1的index的點
+        y_test_trueLabel = y_test[test_trueLabelIdx]
+        #calculate the proportion
+        testDataConsistentRatio = pt.count_nonzero(y_test_trueLabel > 0.5).item() / len(test.y[test_trueLabelIdx])
+        self.fairRatio.append(testDataConsistentRatio)
+        # print("test: ",y_test[test_trueLabelIdx] > 0.5)
+        # print("cnt: ",pt.count_nonzero(y_test[test_trueLabelIdx] > 0.5).item())
+        print("testDataConsistentRatio : ",testDataConsistentRatio)
         # calculate the overall accuracy
         self.overall_acc_list.append(self.calculate_AA(model, self.validation_list))
         # evaluate memory stability
@@ -188,6 +200,9 @@ ex9.draw_PDt()
 ex9.draw_EFT(80)
 ex9.draw_R20_EFT(80,10)
 ex9.draw_R20_EFT(80,20)
+ex9.draw_avgRecourseCost()
+ex9.draw_testDataFairRatio()
+ex9.draw_q3RecourseCost()
 
 # ex1.draw_EFT(240)
 # ex1.draw_R20_EFT(240,23)
