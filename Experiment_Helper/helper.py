@@ -23,7 +23,7 @@ from scipy.spatial.distance import jensenshannon
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from Config.config import test, train, sample
+from Config.continual_config import test, train, sample
 from Models.synapticIntelligence import SynapticIntelligence
 
 pca = PCA(2).fit(train.x)
