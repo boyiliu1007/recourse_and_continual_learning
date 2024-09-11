@@ -223,7 +223,7 @@ ex9 = Example9_Continual_Learning(model, pca, train, test, sample)
 ex9.si = si
 # ani1 = ex1.animate_all(240)
 ex9.save_directory = DIRECTORY
-ROUNDS = 160
+ROUNDS = 240
 ani9 = ex9.animate_all(ROUNDS)
 ani9.save(os.path.join(DIRECTORY, "ex9.mp4"))
 
