@@ -13,7 +13,7 @@ from Experiment_Helper.helper import Helper, pca
 from Models.MLP import MLP, training
 from Models.synapticIntelligence import continual_training
 from Models.recourseOriginal import recourse
-from Config.continual_MLP_config import train, test, sample, model, si, POSITIVE_RATIO
+from Config.continual_MLP_config import train, test, sample, si, POSITIVE_RATIO
 from Dataset.makeDataset import Dataset
 
 current_file_path = __file__
@@ -99,7 +99,7 @@ class Example9_Continual_Learning(Helper):
         #紀錄新增進來的sample資料
         self.addEFTDataFrame(j)
 
-        continual_training(model, self.si, train, 50, lambda_ = 0.01)
+        continual_training(self.si, train, 50, lambda_ = 0.01)
 
         self.si.update_omega(train, nn.BCELoss())
         self.si.consolidate()
@@ -184,7 +184,7 @@ class Example9_Continual_Learning(Helper):
 weight = pt.from_numpy(np.ones(train.x.shape[1]))
 # print(train.x)
 # print(train.y)
-ex9 = Example9_Continual_Learning(model, pca, train, test, sample)
+ex9 = Example9_Continual_Learning(si.model, pca, train, test, sample)
 ex9.si = si
 # ani1 = ex1.animate_all(240)
 ex9.save_directory = DIRECTORY

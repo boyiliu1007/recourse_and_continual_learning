@@ -2,7 +2,6 @@ import torch as pt
 from torch import nn, optim
 from copy import deepcopy
 import numpy as np
-from IPython.display import display
 
 import csv
 import pandas as pd
@@ -13,10 +12,10 @@ from Experiment_Helper.helper import Helper, pca
 from Models.logisticRegression import LogisticRegression, training
 from Models.synapticIntelligence import continual_training
 from Models.recourseOriginal import recourse
-from Config.continual_config import train, test, sample, model, si, POSITIVE_RATIO
+from Config.continual_config import train, test, sample, si, POSITIVE_RATIO
 from Dataset.makeDataset import Dataset
 
-LAMBDA = 0.001
+LAMBDA = 0.01 
 
 current_file_path = __file__
 current_directory = os.path.dirname(current_file_path)
@@ -74,14 +73,14 @@ class Example9_Continual_Learning(Helper):
         train.x[j] = x
         with pt.no_grad():
             train.y[j, 0] = (model(x).flatten() > 0.5).float()
-        print("train.y[j, 0] : ",train.y[j, 0])
-        with pt.no_grad():
-            tensor_list = model(train.x[j]).tolist()
-            # Format the numbers to float
-            formatted_list = [[float(f"{num:.6f}") for num in sublist] for sublist in tensor_list]
-            # Print the formatted list
-            for sublist in formatted_list:
-                print(sublist)
+        # print("train.y[j, 0] : ",train.y[j, 0])
+        # with pt.no_grad():
+        #     tensor_list = model(train.x[j]).tolist()
+        #     # Format the numbers to float
+        #     formatted_list = [[float(f"{num:.6f}") for num in sublist] for sublist in tensor_list]
+        #     # Print the formatted list
+        #     for sublist in formatted_list:
+        #         print(sublist)
 
         # index = y_prob.flatten() > 0.5
         # k = round(len(index) * 0.4)
@@ -117,12 +116,7 @@ class Example9_Continual_Learning(Helper):
         mask = pt.zeros_like(y_prob_all)
         mask[sorted_indices[:cutoff_index]] = 1
         train.y = mask.float()
-        print("y_copy",y_copy)
-        print("train.y",train.y.clone().detach().squeeze())
-        if (y_copy == train.y.clone().detach().squeeze()).all():
-            print("y_copy == train.y")
-        else:
-            print("y_copy != train.y")
+        
 
         val_data = Dataset(train.x[j], train.y[j])
         self.validation_list.append(val_data)
@@ -134,7 +128,7 @@ class Example9_Continual_Learning(Helper):
         #紀錄新增進來的sample資料
         self.addEFTDataFrame(j)
 
-        continual_training(model, self.si, train, 50, lambda_ = LAMBDA)
+        continual_training(self.si, train, 50, lambda_ = LAMBDA)
 
         self.si.update_omega(train, nn.BCELoss())
         self.si.consolidate()
@@ -219,19 +213,20 @@ class Example9_Continual_Learning(Helper):
 weight = pt.from_numpy(np.ones(train.x.shape[1]))
 # print(train.x)
 # print(train.y)
-ex9 = Example9_Continual_Learning(model, pca, train, test, sample)
+
+ex9 = Example9_Continual_Learning(si.model, pca, train, test, sample)
 ex9.si = si
 # ani1 = ex1.animate_all(240)
 ex9.save_directory = DIRECTORY
-ROUNDS = 240
-ani9 = ex9.animate_all(ROUNDS)
+ROUNDS = 80
+ani9 = ex9.animate_all(ROUNDS, inplace = True)
 ani9.save(os.path.join(DIRECTORY, "ex9.mp4"))
 
 # ex1.draw_PDt()
-ex9.draw_PDt()
-ex9.draw_EFT(ROUNDS)
-ex9.draw_R20_EFT(ROUNDS,8)
-ex9.draw_R20_EFT(ROUNDS,10)
+# ex9.draw_PDt()
+# ex9.draw_EFT(ROUNDS)
+# ex9.draw_R20_EFT(ROUNDS,8)
+# ex9.draw_R20_EFT(ROUNDS,10)
 
 # ex1.draw_EFT(240)
 # ex1.draw_R20_EFT(240,23)
@@ -239,7 +234,7 @@ ex9.draw_R20_EFT(ROUNDS,10)
 # ex1.draw_R20_EFT(240,58)
 ex9.draw_Fail_to_Recourse_on_Model()
 ex9.draw_Fail_to_Recourse_on_Label()
-display(ex9.EFTdataframe)
+# display(ex9.EFTdataframe)
 ex9.plot_matricsA()
 ex9.plot_Ajj()
 ex9.plot_jsd()

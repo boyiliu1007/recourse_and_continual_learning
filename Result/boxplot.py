@@ -56,6 +56,5 @@ def draw(all = False):
         # Show the plot
         plt.savefig('Result/boxplot.png')
         plt.show()
-        
 
 draw()

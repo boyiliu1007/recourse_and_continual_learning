@@ -16,7 +16,7 @@ criterion = nn.BCELoss()
 optimizer = optim.Adam(model.parameters(), lr = 0.001)
 si = SynapticIntelligence(model)
 
-continual_training(model, si, train, 100, loss_list, lambda_=0)
+continual_training(si, train, 100, loss_list, lambda_=0)
 si.update_omega(train, criterion)
 si.consolidate()
 

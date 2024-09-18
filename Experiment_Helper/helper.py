@@ -35,6 +35,7 @@ class Helper:
 
     def __init__(self, model: nn.Module, pca: PCA, train: Dataset, test: Dataset, sample: Dataset):
         self.model = model
+        print(self.model)
         self.pca = pca
         self.train = train
         self.test = test
@@ -72,7 +73,7 @@ class Helper:
         self._sc_test: PathCollection
         self._ct_test: QuadContourSet
         self.lr = 0.1
-        self.si = SynapticIntelligence(self.model)
+        self.si: SynapticIntelligence
         self.save_directory = None
 
     # def draw_proba_hist(self, ax: Axes | None = None, *, label: bool = False):
