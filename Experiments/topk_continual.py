@@ -15,7 +15,7 @@ from Models.recourseOriginal import recourse
 from Config.continual_config import train, test, sample, si, POSITIVE_RATIO
 from Dataset.makeDataset import Dataset
 
-LAMBDA = 0.01 
+LAMBDA = 0.1
 
 current_file_path = __file__
 current_directory = os.path.dirname(current_file_path)
@@ -131,7 +131,7 @@ class Example9_Continual_Learning(Helper):
         continual_training(self.si, train, 50, lambda_ = LAMBDA)
 
         self.si.update_omega(train, nn.BCELoss())
-        self.si.consolidate()
+        self.si.consolidate(3)
 
         # calculate the overall accuracy
         self.overall_acc_list.append(self.calculate_AA(model, self.validation_list))
@@ -238,6 +238,7 @@ ex9.draw_Fail_to_Recourse_on_Label()
 ex9.plot_matricsA()
 ex9.plot_Ajj()
 ex9.plot_jsd()
+print(ex9.testacc)
 
 column_name = f'{current_file_name}_k-{POSITIVE_RATIO}_c-{LAMBDA}'
 if os.path.exists(RESULT_DIR):

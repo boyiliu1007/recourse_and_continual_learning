@@ -9,7 +9,7 @@ from Models.logisticRegression import LogisticRegression
 from Models.logisticRegression import training
 from Models.synapticIntelligence import SynapticIntelligence, continual_training
 
-POSITIVE_RATIO = 0.75
+POSITIVE_RATIO = 0.5
 train, test, sample = make_dataset(100, 100, 2000, POSITIVE_RATIO, 'synthetic')
 model = LogisticRegression(train.x.shape[1], 1)
 loss_list = []
@@ -18,8 +18,6 @@ optimizer = optim.Adam(model.parameters(), lr = 0.001)
 si = SynapticIntelligence(model)
 
 continual_training(si, train, 100, loss_list, lambda_=0)
-si.update_omega(train, criterion)
-si.consolidate()
 
 plt.figure()
 plt.plot(loss_list)

@@ -9,6 +9,7 @@ from Models.logisticRegression import training
 POSITIVE_RATIO = 0.5
 train, test, sample = make_dataset(100, 100, 2000, POSITIVE_RATIO, 'synthetic')
 print(train.x.shape)
+print(train.x)
 model = LogisticRegression(train.x.shape[1], 1)
 loss_list = []
 training(model, train, 50, loss_list)
