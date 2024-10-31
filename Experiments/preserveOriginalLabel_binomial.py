@@ -9,9 +9,9 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from Experiment_Helper.helper import Helper, pca
 from Models.logisticRegression import LogisticRegression, training
-from Models.recourseOriginal import recourse
+from Models.recourseGradient import recourse
 from Config.config import train, test, sample, model
-from Config.MLP_config import MLP_model
+from Config.config import model
 from Dataset.makeDataset import Dataset
 
 current_file_path = __file__
@@ -76,7 +76,7 @@ class Example1(Helper):
         if len(sub_sample) > 0:
             # print("sub_sample: ",sub_sample.y)
             # print("sub_sample.y size: ",sub_sample.y.size())
-            recourse(model, sub_sample, 10,threshold=0.9)
+            recourse(model, sub_sample, 10, pt.ones(sub_sample.x.shape), threshold=0.9)
             test = deepcopy(x)
 
             #change the attributes that performed recourse
@@ -205,8 +205,8 @@ class Example1(Helper):
 # weight = pt.from_numpy(np.random.gamma(3,1,20))
 # print(train.x)
 # print(train.y)
-BinomialProb = 0.7
-ex1 = Example1(MLP_model, pca, train, test, sample)
+BinomialProb = 0.01
+ex1 = Example1(model, pca, train, test, sample)
 ex1.save_directory = DIRECTORY
 # ani1 = ex1.animate_all(80)
 

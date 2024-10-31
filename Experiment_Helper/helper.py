@@ -23,7 +23,7 @@ from scipy.spatial.distance import jensenshannon
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from Config.continual_config import test, train, sample
+from Config.config import test, train, sample
 from Models.synapticIntelligence import SynapticIntelligence
 
 pca = PCA(2).fit(train.x)
@@ -75,6 +75,8 @@ class Helper:
         self.lr = 0.1
         self.si: SynapticIntelligence
         self.save_directory = None
+
+        self.testacc = []
 
     # def draw_proba_hist(self, ax: Axes | None = None, *, label: bool = False):
     def draw_proba_hist(self, ax: Axes = None, *, label: bool = False):
@@ -517,8 +519,10 @@ class Helper:
         for j in jth_data_after_recourse:
           pred = kth_model(j.x)
           acc = self.calculate_accuracy(pred, j.y)
+          self.testacc.append(acc)
           sum += acc
 
+        self.testacc.append('|')
         return sum / len(jth_data_after_recourse)
 
       print("jth_data_after_recourse cannot be empty")

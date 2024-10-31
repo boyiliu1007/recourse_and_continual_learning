@@ -38,7 +38,11 @@ def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.T
     for _ in range(max_epochs):
         optimizer.zero_grad()
         x_hat,cost = r_model(dataset.x)
+        for name, param in c_model.named_parameters():
+            print(name, param.data)
         y_hat = c_model(x_hat)
+        for name, param in c_model.named_parameters():
+            print(name, param.data)
         #lamda = 0.5
         # loss = criterion(y_hat, dataset.y) + 0.3 * pt.pow(pt.sum((cost * weight) * (cost * weight)),1/2)
         loss = criterion(y_hat, threshold) + 0.3 * pt.pow(pt.sum((cost * weight) * (cost * weight)),1/2)

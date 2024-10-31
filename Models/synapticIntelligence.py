@@ -8,8 +8,9 @@ class SynapticIntelligence:
         self.model = model
         self.prev_params = {}
         self.omega = {}
+        self.omega_list = []
         self.param_updates = {}
-        self.epsilon = 0.1  # Small value to avoid division by zero
+        self.epsilon = 0.00000001  # Small value to avoid division by zero
 
         for name, param in self.model.named_parameters():
             self.prev_params[name] = param.data.clone()
@@ -29,24 +30,44 @@ class SynapticIntelligence:
                     # if the updated parameter is important, the gradient w.r.t. it will be large
                     self.param_updates[name] += param.grad.detach() ** 2
 
-    def cosine_similarity_loss(u, v):
-        dot_prod = pt.sum(u * v, dim=-1)
-        mag_u = pt.norm(u, dim=-1)
-        mag_v = pt.norm(v, dim=-1)
-        cos_sim = dot_prod / (mag_u * mag_v)
+    # def cosine_similarity_loss(u, v):
+    #     dot_prod = pt.sum(u * v, dim=-1)
+    #     mag_u = pt.norm(u, dim=-1)
+    #     mag_v = pt.norm(v, dim=-1)
+    #     cos_sim = dot_prod / (mag_u * mag_v)
 
-        # Maximize similarity
-        loss = 1 - cos_sim
+    #     # Maximize similarity
+    #     loss = 1 - cos_sim
 
-        return loss
+    #     return loss
     
-    def consolidate(self):
+    def _weight_func(self, x):
+        return x*x*x
+    
+    def _get_weight(self, observe_range):
+        weights = []
+        for i in range (1, observe_range + 1):
+            weights.append(self._weight_func(i))
+        weights_tensor = pt.tensor(weights, dtype=pt.float32)
+        return weights_tensor / sum(weights_tensor)
+
+    def consolidate(self, observe_range):
+        curr_omega = {}
         for name, param in self.model.named_parameters():
             delta = param.data - self.prev_params[name]
-            print("param:", param)
-            print("prev_params:", self.prev_params[name])
-            print("delta1:", delta)
-            self.omega[name] += self.param_updates[name] / (delta ** 2 + self.epsilon)
+            curr_omega[name] =  self.param_updates[name] / (delta ** 2 + self.epsilon)
+        self.omega_list.append(curr_omega)
+
+        for name, param in self.model.named_parameters():
+            if len(self.omega_list) >= observe_range:
+                omega_sum = pt.zeros_like(param)
+                weights = self._get_weight(observe_range)
+                for i in range(-1, -observe_range - 1, -1):
+                    omega_sum += self.omega_list[i][name] * weights[i]
+                self.omega[name] = omega_sum
+            else:
+                for i in range(len(self.omega_list)):
+                    self.omega[name] += self.omega_list[i][name]
             self.prev_params[name] = param.data.clone()
             self.param_updates[name].zero_()
 
@@ -71,8 +92,11 @@ def continual_training(si: SynapticIntelligence, dataset: Dataset, max_epochs: i
         outputs = si.model(dataset.x)
         loss = criterion(outputs, dataset.y)
         epochCount += 1
-        loss += si.compute_si_loss(lambda_) # 0.005 is a hyperparameter used to scale the SI loss
+        loss += si.compute_si_loss(lambda_) * 0.005 # 0.005 is a hyperparameter used to scale the SI loss
         loss.backward()
         optimizer.step()
         if loss_list is not None:
             loss_list.append(loss.item())
+
+
+
