@@ -111,6 +111,24 @@ class Example1(Helper):
         #紀錄新增進來的sample資料
         self.addEFTDataFrame(j)
 
+        #紀錄Fail_to_Recourse
+        if len(x[recourseIndex]) > 0:
+            with pt.no_grad():
+                y_prob: pt.Tensor = model(x[recourseIndex])
+
+            # print("x[y_pred] : ",x[y_pred])
+            # print("after model update:")
+            # print("y_prob:",y_prob)
+            # print("y_prob[y_prob < 0.5]",y_prob[y_prob < 0.5])
+            recourseFailCnt = len(y_prob[y_prob < 0.5])
+            print("y_prob[y_prob < 0.5] : ",y_prob[y_prob < 0.5])
+            print("recourseFailCnt",recourseFailCnt)
+            recourseFailRate = recourseFailCnt / len(x[recourseIndex])
+            # print("recourseFailRate : ",recourseFailRate)
+            self.failToRecourse.append(recourseFailRate)
+        else:
+            print("no Recourse:")
+            self.failToRecourse.append(0)
 
         training(model, train, 50)
         
@@ -134,23 +152,24 @@ class Example1(Helper):
         self.memory_plasticity_list.append(self.calculate_FWT(self.Ajj_performance_list, self.Aj_tide_list))
 
 
-        #紀錄Fail_to_Recourse
-        if len(x[y_pred]) > 0:
-            with pt.no_grad():
-                y_prob: pt.Tensor = model(x[y_pred])
+        # #紀錄Fail_to_Recourse
+        # if len(x[recourseIndex]) > 0:
+        #     with pt.no_grad():
+        #         y_prob: pt.Tensor = model(x[recourseIndex])
 
-            # print("x[y_pred] : ",x[y_pred])
-            # print("after model update:")
-            # print("y_prob:",y_prob)
-            # print("y_prob[y_prob < 0.5]",y_prob[y_prob < 0.5])
-            recourseFailCnt = len(y_prob[y_prob < 0.5])
-            # print("recourseFailCnt",recourseFailCnt)
-            recourseFailRate = recourseFailCnt / len(x[y_pred])
-            # print("recourseFailRate : ",recourseFailRate)
-            self.failToRecourse.append(recourseFailRate)
-        else:
-            print("no Recourse:")
-            self.failToRecourse.append(0)
+        #     # print("x[y_pred] : ",x[y_pred])
+        #     # print("after model update:")
+        #     # print("y_prob:",y_prob)
+        #     # print("y_prob[y_prob < 0.5]",y_prob[y_prob < 0.5])
+        #     recourseFailCnt = len(y_prob[y_prob < 0.5])
+        #     print("y_prob[y_prob < 0.5] : ",y_prob[y_prob < 0.5])
+        #     print("recourseFailCnt",recourseFailCnt)
+        #     recourseFailRate = recourseFailCnt / len(x[recourseIndex])
+        #     # print("recourseFailRate : ",recourseFailRate)
+        #     self.failToRecourse.append(recourseFailRate)
+        # else:
+        #     print("no Recourse:")
+        #     self.failToRecourse.append(0)
 
         self.EFTdataframe = self.EFTdataframe.assign(updateRounds = self.EFTdataframe['updateRounds'] + 1)
         self.round = self.round + 1
@@ -212,7 +231,7 @@ print("outside: ",weight)
 # cost = []
 # print(train.x)
 # print(train.y)
-BinomialProb = 0.9
+BinomialProb = 0.7
 ex1 = Example1(model, pca, train, test, sample)
 ex1.save_directory = DIRECTORY
 # ani1 = ex1.animate_all(80)
@@ -234,6 +253,8 @@ ex1.draw_R20_EFT(80,20)
 ex1.draw_avgRecourseCost()
 ex1.draw_testDataFairRatio()
 ex1.draw_q3RecourseCost()
+ex1.draw_failToRecourseCompareToNormalModel()
+ex1.draw_avgRecourseCostCompareToNormalModel()
 
 # ex1.draw_EFT(150)
 # ex1.draw_R20_EFT(150,30)

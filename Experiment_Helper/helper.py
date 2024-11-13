@@ -37,9 +37,11 @@ class Helper:
         self.train = train
         self.test = test
         self.sample = sample
-        self.avgRecourseCost_list=[]
-        self.fairRatio=[]
-        self.q3RecourseCost=[]
+        self.avgRecourseCost_list = []
+        self.avgRecourseCostOnNormalModel_list = [0.06159922992002644, 0.12086665188383333, 0.12428388443361009, 0.09327902214606151, 0.0914254747813962, 0.10181462205051678, 0.06512063602287499, 0.05560648227644058, 0.14264473209587378, 4.09476747603947e-10, 0.052722483241979104, 0.19565176651228425, 0.06654292898757293, 0.06011031716706189, 0.09046107084462783, 0.09270152840961687, 0.051453308538206, 0.03577024625382576, 0.016691426807023336, 0.08029367543314575, 0.026682426600765776, 0.03204131528429175, 0.04240766617553736, 0.014405035321681572, 0.04639084834714248, 0.050464024788218174, 0.012282079520451657, 0.05285377481895858, 0.059932515457909896, 0.04251443191028677, 0.05739795532695681, 0.05558917593451114, 0.028256987581770848, 6.73931037377352e-25, 0.09796421873509148, 0.03888524785536303, 0.04657775858007727, 0.05730771480139618, 1.5402928308309566e-06, 0.06509942725759371, 0.0491878879805011, 0.00039157206276569187, 0.07065706911599993, 0.06210125794068486, 0.04395887542651051, 0.043938844512779185, 0.02238094295522375, 0.062207699089470395, 0.08282516573412534, 0.09728769390268684, 0.044728735811752546, 0.037621906280156193, 0.05039526779801566, 0.050188176154787205, 0.024204884508321714, 3.260193750713085e-20, 0.09291165744579091, 0.02995874151072171, 0.008952477908322693, 0.052271700241058636, 8.04082868080906e-05, 0.03617987324863985, 0.0017337123456435944, 0.017247563861170864, 0.01080249299107777, 0.048440334502938, 1.4813621746908996e-16, 0.03357194517838013, 0.033571785361655185, 0.02210148653736829, 0.03650270177876014, 0.05248624145473789, 0.010576933945023938, 0.0670926706085056, 1.4454213688446538e-05, 0.02168657426886433, 0.02674180725114156, 0.029348920762914146, 0.07503762732903632]
+        self.ratioOfDifferentLabel = []
+        self.fairRatio = []
+        self.q3RecourseCost = []
         self.PDt = []
         self.round = 0
         self.EFTdataframe =  pd.DataFrame(
@@ -58,6 +60,11 @@ class Helper:
         self.failToRecourseOnModel = []
         self.failToRecourseOnLabel = []
         self.failToRecourse = []
+        self.failToRecourseBeforeModelUpdate = []
+        self.failToRecourseOnNormalModel = [0.0, 0.053763440860215055, 0.12903225806451613, 0.030927835051546393, 0.0425531914893617, 0.04081632653061224, 0.0, 0.0, 0.07291666666666667, 1.0, 0.0, 0.0, 0.0, 0.0, 0.03333333333333333, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.011494252873563218, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.010416666666666666, 0.011235955056179775, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.02040816326530612, 0.0, 0.0, 0.010752688172043012, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.02127659574468085, 0.0, 0.0, 0.0, 0.0196078431372549, 0.010526315789473684, 0.0, 0.009708737864077669, 0.0, 0.0, 0.010752688172043012, 0.0, 0.0, 0.0, 0.009900990099009901, 0.024096385542168676, 0.0125, 0.0, 0.0425531914893617, 0.0, 0.0, 0.0, 0.0, 0.02040816326530612, 0.0, 0.0, 0.0, 0.0, 0.019230769230769232, 0.020833333333333332]
+        self.recourseModelLossList = []
+        self.RegreesionModelLossList = []
+        self.RegreesionModel_valLossList = []
 
         self.validation_list = []
         self.Ajj_performance_list = []
@@ -210,10 +217,13 @@ class Helper:
     def animate_all(self, frames: int = 120, fps: int = 10, *, inplace: bool = False):
         fig, (ax0, ax1, ax2) = self.draw_all()
 
-        model = self.model if inplace else deepcopy(self.model)
-        train = self.train if inplace else deepcopy(self.train)
-        test = self.test
-        sample = self.sample
+        print("inplace: ",inplace)
+        # model = self.model if inplace else deepcopy(self.model)
+        # train = self.train if inplace else deepcopy(self.train)
+        # model = self.model
+        # train = self.train
+        # test = self.test
+        # sample = self.sample
 
         def init():
             return *ax0.patches, *ax1.collections, *ax2.collections
@@ -224,7 +234,7 @@ class Helper:
             if frame == 0:
                 return ()
 
-            self.update(model, train, sample)
+            self.update(self.model, self.train, self.sample)
 
             y = test.y.flatten()
 
@@ -232,7 +242,7 @@ class Helper:
             m = n - pt.count_nonzero(y)
 
             with pt.no_grad():
-                y_prob: pt.Tensor = model(test.x)
+                y_prob: pt.Tensor = self.model(test.x)
 
             y_prob = y_prob.flatten()
             y_pred = y_prob.greater(0.5)
@@ -260,7 +270,7 @@ class Helper:
             z = pca.inverse_transform(xy.reshape(2, n * n).T)
             z = pt.tensor(z, dtype=pt.float)
             with pt.no_grad():
-                z: pt.Tensor = model(z)
+                z: pt.Tensor = self.model(z)
             z = z.view(n, n)
 
             self._ct_test: QuadContourSet = ax2.contourf(
@@ -307,7 +317,53 @@ class Helper:
         plt.ylabel('PDt')
         plt.title('PDt during Rounds')
         plt.savefig(os.path.join(self.save_directory, 'PDt during Rounds.png'))
+        
+    def draw_avgRecourseCostCompareToNormalModel(self):
+        x = [20] * 20 + [40] * 20 + [60] * 20 + [80] * 19
+        print("self.avgRecourseCost_list : ",self.avgRecourseCost_list)
+        df_recourseFailRate = pd.DataFrame({
+            'rounds': x,
+            'avgRecourseCost': self.avgRecourseCost_list,
+            'model' : ['now'] * 79
+        })
+        df_recourseFailRateNormalModel = pd.DataFrame({
+            'rounds': x,
+            'avgRecourseCost': self.avgRecourseCostOnNormalModel_list,
+            'model' : ['normal'] * 79
+        })
+        # print("self.avgRecourseCost_list : ",self.avgRecourseCost_list)
+        df_combined = pd.concat([df_recourseFailRate, df_recourseFailRateNormalModel], ignore_index=True)
+        plt.figure()
+        # sns.boxplot(x='rounds',y='EFPList',data = self.EFTdataframe)
+        sns_plot = sns.boxplot(x = 'rounds',y = 'avgRecourseCost',hue= 'model',data = df_combined)
+        print("avgRecourseCost draw!")
+        plt.savefig(os.path.join(self.save_directory, 'avgRecourseCostCompareToNormalModel.png'))
 
+    def draw_failToRecourseCompareToNormalModel(self):
+        # recourseFailRate = pd.Series(self.failToRecourse)
+        # x = pd.Series([20,40,60,80])
+        x = [20] * 20 + [40] * 20 + [60] * 20 + [80] * 19
+        df_recourseFailRate = pd.DataFrame({
+            'rounds': x,
+            'failRate': self.failToRecourse,
+            'model' : ['now'] * 79
+        })
+        df_recourseFailRateNormalModel = pd.DataFrame({
+            'rounds': x,
+            'failRate': self.failToRecourseOnNormalModel,
+            'model' : ['normal'] * 79
+        })
+        df_combined = pd.concat([df_recourseFailRate, df_recourseFailRateNormalModel], ignore_index=True)
+        # print("self.failToRecourse",self.failToRecourse)
+        plt.figure()
+        # sns.boxplot(x='rounds',y='EFPList',data = self.EFTdataframe)
+        sns_plot = sns.boxplot(x = 'rounds',y = 'failRate',hue= 'model',data = df_combined)
+        print("FailtoRecourse draw!")
+        plt.savefig(os.path.join(self.save_directory, 'failToRecourseCompareToNormalModel.png'))
+        # sns_plot = sns.boxplot(x = 'rounds',y = 'failRate',data = df_recourseFailRate)
+        # fig = sns_plot.get_figure()
+        # fig.savefig("failToRecourseCompareToNormalModel.png") 
+    
     def draw_EFT(self,epochs):
         data = []
         labels = [(epochs / 10 - 1) * (i+1) for i in range(10)]
@@ -420,6 +476,49 @@ class Helper:
         plt.ylabel('Fail_to_Recourse_on_Label')
         plt.title('FtR during Rounds')
         plt.savefig(os.path.join(self.save_directory, 'Fail_to_Recourse_on_Label.png'))
+        
+    def draw_failToRecourseBeforeModelUpdate(self):
+        plt.figure()
+        plt.plot(self.failToRecourseBeforeModelUpdate)
+        plt.xlabel('Round')
+        plt.ylabel('Fail_to_Recourse')
+        plt.title('FtR during Rounds')
+        plt.savefig(os.path.join(self.save_directory, 'Fail_to_Recourse_BeforeUpdate.png'))
+    
+    def draw_Fail_to_Recourse_with_Model_Loss(self):
+        plt.figure()
+        plt.plot(self.recourseModelLossList,label='RecourseLoss',color='red')
+        plt.plot(self.failToRecourse,label='FailtoRecourse',color='green')
+        plt.plot(self.failToRecourseBeforeModelUpdate,label='FailtoRecourse_Before',color='blue')
+        plt.xlabel('Round')
+        plt.title('FtR_RecourseLoss during Rounds')
+        plt.legend()
+        plt.savefig(os.path.join(self.save_directory, 'Fail_to_Recourse_with_RecourseLoss.png'))
+        
+    def draw_recourseModelLoss(self):
+        plt.figure()
+        plt.plot(self.recourseModelLossList)
+        plt.xlabel('Round')
+        plt.ylabel('recourseModel_Loss')
+        plt.title('recourseModel_Loss')
+        plt.savefig(os.path.join(self.save_directory, 'recourseModel_Loss.png'))
+        
+    def draw_RegressionModelLoss(self):
+        plt.figure()
+        plt.plot(self.RegreesionModelLossList)
+        plt.xlabel('Round')
+        plt.ylabel('RegreesionModel_Loss')
+        plt.title('RegreesionModel_Loss')
+        plt.savefig(os.path.join(self.save_directory, 'RegreesionModel_Loss.png'))
+    
+    def draw_RegressionModelValLoss(self):
+        plt.figure()
+        plt.plot(self.RegreesionModel_valLossList)
+        plt.xlabel('Round')
+        plt.ylabel('RegreesionModel_valLoss')
+        plt.title('RegreesionModel_valLoss')
+        plt.savefig(os.path.join(self.save_directory, 'RegreesionModel_valLoss.png'))
+        
 
     #紀錄新增進來的sample資料
     def addEFTDataFrame(self,index):
@@ -585,6 +684,23 @@ class Helper:
         plt.ylabel('Recourse_Cost')
         plt.title('Q3_Recourse_Cost')
         plt.savefig(os.path.join(self.save_directory, 'Q3RecourseCost.png'))
+        
+    def draw_topkRatioOfDifferentLabel(self):
+        # y_prob = deepcopy(y_prob_all)
+        # print("y_prob: ",y_prob)
+        # print("y_prob_all: ",y_prob_all)
+        #do the labeling according to the probability
+        # y_prob[y_prob > 0.5] = 1
+        # y_prob[y_prob <= 0.5] = 0
+        # print("After labeling")
+        # print("y_prob: ",y_prob)
+        # print("y_prob_all: ",y_prob_all)
+        plt.figure()
+        plt.plot(self.ratioOfDifferentLabel)
+        plt.xlabel('Round')
+        plt.ylabel('RatioOfDifferentLabel')
+        plt.title('RatioOfDifferentLabel')
+        plt.savefig(os.path.join(self.save_directory, 'RatioOfDifferentLabel.png'))
 
     def update(self, model: nn.Module, train: Dataset, sample: Dataset):
         raise NotImplementedError()

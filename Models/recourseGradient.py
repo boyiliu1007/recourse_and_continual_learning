@@ -28,11 +28,12 @@ class Recourse(nn.Module):
 
 
 # def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.Tensor | None = None, loss_list: list | None = None):
-def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.Tensor = None, loss_list: list = None,cost_list = None,threshold = 1.0,q3RecourseCost: list = None):
+def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.Tensor = None, loss_list: list = None,cost_list = None,threshold = 1.0,q3RecourseCost: list = None,recourseModelLossList: list = None):
     loss: pt.Tensor
     r_model = Recourse(dataset.x.shape)
     criterion = nn.HuberLoss()
     optimizer = optim.Adam(r_model.parameters(), 0.1)
+    # print("Enter Recourse",c_model.state_dict())
     # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer)
     
     # threshold = pt.ones(dataset.y.size())
@@ -45,9 +46,11 @@ def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.T
         x_hat,cost = r_model(dataset.x)
         # print("cost: ",cost)
         y_hat = c_model(x_hat)
+        # print("y_hat: ",y_hat)
         #lamda = 0.5
         # loss = criterion(y_hat, dataset.y) + 0.3 * pt.pow(pt.sum((cost * weight) * (cost * weight)),1/2)
         loss = criterion(y_hat, threshold) + 0.3 * pt.pow(pt.sum((cost * weight) * (cost * weight)),1/2)
+        # print("loss: ",loss.item())
         #clear gradient
         optimizer.zero_grad()
         #calculate gradient
@@ -61,6 +64,7 @@ def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.T
         if loss_list is not None:
             loss_list.append(loss.item())
     r_model.eval()
+    recourseModelLossList.append(loss.item())
 
     with pt.no_grad():
         recourseCostLimit = 100
@@ -85,18 +89,18 @@ def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.T
                 # print("Recourse cost: ",L2_cost.item())
                 #Gradient = f(x)' - lambda * cost(x,x') > 0
                 a = c_model(recourseX[idx])
-                print("f(x)':",a)
+                # print("f(x)':",a)
                 recourseGradient = a -  (1 / recourseLambda) * pt.pow(pt.sum((t * weight) * (t * weight)),1/2)
                 # print("recourse gradient: ",recourseGradient)
                 #set the recourse cost limit
-                if L2_cost < recourseCostLimit:
-                # if recourseGradient > 0:
-                    print("pass the limit!")
+                # if L2_cost < recourseCostLimit:
+                if recourseGradient >= 0:
+                    # print("pass the limit!")
                     dataset.x[idx] = recourseX[idx]
                 avgRecourseCost += L2_cost
                 recourseCostList.append(L2_cost.item())
                 # cost_list.append(L2_cost.item())
-                print("Recourse cost: ",L2_cost.item())
+                # print("Recourse cost: ",L2_cost.item())
             # print("After Recourse",dataset.x)
             avgRecourseCost /= len(cost)
             if q3RecourseCost is not None:

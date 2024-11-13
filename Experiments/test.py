@@ -3,28 +3,21 @@ from torch import nn, optim
 from copy import deepcopy
 import numpy as np
 from IPython.display import display
-import copy
 
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from Experiment_Helper.helper import Helper, pca
 from Models.logisticRegression import LogisticRegression, training
-from Models.recourseGradient import recourse
-# from Models.recourseOriginal import recourse
-from Config.config import train, test, sample, model
+# from Models.recourseGradient import recourse
+from Models.recourseOriginal import recourse
+from Config.config import train, test, sample, model, POSITIVE_RATIO
 from Dataset.makeDataset import Dataset
 
 current_file_path = __file__
 current_directory = os.path.dirname(current_file_path)
 current_file_name = os.path.basename(current_file_path)
 current_file_name = os.path.splitext(current_file_name)[0]
-
-loss_list=[]
-cost=[]
-cutoff_threshold = 0.5
-originalModel = copy.deepcopy(model)
-weight = pt.from_numpy(np.ones(train.x.shape[1])) / train.x.shape[1]
 
 DIRECTORY = os.path.join(current_directory, f"{current_file_name}_output")
 
@@ -46,7 +39,6 @@ class Example9(Helper):
     #add first k              k maybe 40% 80% 100%
 
     def update(self, model: nn.Module, train: Dataset, sample: Dataset):
-        global cutoff_threshold
         print("round: ",self.round)
         #get model parameters before model updated
         modelParams = list(model.parameters())
@@ -69,23 +61,23 @@ class Example9(Helper):
         y_pred = y_prob.flatten() < 0.5
         # print("~y_pred : ",y_pred)
         sub_sample = Dataset(x[y_pred], pt.ones((y_pred.count_nonzero(), 1)))
-        # print("sub_sample :",sub_sample.x)
-        # a = sub_sample.x
-        # recourse(model, sub_sample, 100, weight,loss_list=[],cost_list=cost)
-        # b = sub_sample.x
-        # print("a b equal :",pt.equal(a,b))
-        # print("After recourse sub_sample :",sub_sample.x)
-        # recourse(model, sub_sample, 10)
-        # print(cost)
-        
-        print("cutoff_threshold: ",cutoff_threshold)
-        recourse(originalModel, sub_sample, 100, weight,loss_list=[],cost_list=cost,threshold=0.01)
-        # recourse(originalModel, sub_sample, 100,loss_list=[],cost_list=cost,threshold=0.5)
-        with pt.no_grad():
-          y_prob_all: pt.Tensor = model(sub_sample.x)
-          print("Recourse_x :",y_prob_all)
 
-        x[y_pred] = sub_sample.x
+        #Recourse with weight
+        # recourse(model, sub_sample, 200, weight,loss_list=[],threshold=0.5,cost_list=self.avgRecourseCost_list,q3RecourseCost=self.q3RecourseCost)
+        #Recourse without weight
+        print("Imagine Recourse:")
+        recourse(model,sub_sample,200,loss_list=[],threshold=0.7)
+        with pt.no_grad():
+            y_prob: pt.Tensor = model(sub_sample.x)
+            print("y_prob : ",y_prob)
+            
+        recourseFailCntBeforeUpdate = len(y_prob[y_prob < 0.5])
+        # print("recourseFailCnt",recourseFailCnt)
+        recourseFailRateBeforeUpdate = recourseFailCntBeforeUpdate / len(sub_sample)
+        # print("recourseFailRate : ",recourseFailRate)
+        self.failToRecourseBeforeModelUpdate.append(recourseFailRateBeforeUpdate)
+
+        # x[y_pred] = sub_sample.x
 
         j = np.random.choice(train.x.shape[0], size, False)
         train.x[j] = x
@@ -98,14 +90,20 @@ class Example9(Helper):
 
         with pt.no_grad():
           y_prob_all: pt.Tensor = model(train.x)
-        #   print("y_prob_all :",y_prob_all)
+          
+        approvedLabelLength = (y_prob_all > 0.5).count_nonzero()
+        deniedLabelLength = (y_prob_all <= 0.5).count_nonzero()
+        # allDataLength = len(y_prob_all)
+        self.ratioOfDifferentLabel.append(approvedLabelLength.item() / deniedLabelLength.item())
+        
+        # print("y_prob_all[y_prob_all > 0.5] length: ",len(y_prob_all[y_prob_all > 0.5]))
+        # print("approvedLabelLength : ",approvedLabelLength)
+        # print("allDataLength : ",allDataLength)
 
+        #do the topK labeling
         sorted_indices = pt.argsort(y_prob_all[:, 0], dim=0, descending=True)
-        cutoff_index = len(sorted_indices) // 2
-        cutoff_threshold = y_prob_all[sorted_indices[cutoff_index - 1]][0]
+        cutoff_index = int(len(sorted_indices) * POSITIVE_RATIO)
         # print("sorted_indices", sorted_indices)
-        # print("sorted_indices[cutoff_index] : ",sorted_indices[cutoff_index])
-        print("cutoff_threshold", cutoff_threshold)
         mask = pt.zeros_like(y_prob_all)
         mask[sorted_indices[:cutoff_index]] = 1
         train.y = mask.float()
@@ -120,10 +118,34 @@ class Example9(Helper):
         #紀錄新增進來的sample資料
         self.addEFTDataFrame(j)
 
-        #This experiment we don't update the real model but the imagine model
-        # training(model, train, 50)
-        # training(imagineModel, train, 50)
+        # #紀錄Fail_to_Recourse
+        # with pt.no_grad():
+        #     y_prob: pt.Tensor = model(sub_sample.x)
 
+        # # print("x[y_pred] : ",x[y_pred])
+        # # print("after model update:")
+        # # print("y_prob:",y_prob)
+        # # print("y_prob[y_prob < 0.5]",y_prob[y_prob < 0.5])
+        # recourseFailCnt = len(y_prob[y_prob < 0.5])
+        # # print("recourseFailCnt",recourseFailCnt)
+        # recourseFailRate = recourseFailCnt / len(x[y_pred])
+        # # print("recourseFailRate : ",recourseFailRate)
+        # self.failToRecourse.append(recourseFailRate)
+
+        training(model, train, 50)
+        
+        #Calculate the proportion of test data labels that remain consistent in the new round of labeling.   
+        with pt.no_grad():
+          y_test: pt.Tensor = model(self.test.x)
+        test_trueLabelIdx = test.y.flatten() > 0.5
+        #在test data中label為1的index的點
+        y_test_trueLabel = y_test[test_trueLabelIdx]
+        #calculate the proportion
+        testDataConsistentRatio = pt.count_nonzero(y_test_trueLabel > 0.5).item() / len(test.y[test_trueLabelIdx])
+        self.fairRatio.append(testDataConsistentRatio)
+        # print("test: ",y_test[test_trueLabelIdx] > 0.5)
+        # print("cnt: ",pt.count_nonzero(y_test[test_trueLabelIdx] > 0.5).item())
+        print("testDataConsistentRatio : ",testDataConsistentRatio)
         # calculate the overall accuracy
         self.overall_acc_list.append(self.calculate_AA(model, self.validation_list))
         # evaluate memory stability
@@ -131,23 +153,20 @@ class Example9(Helper):
         # evaluate memory plasticity
         self.memory_plasticity_list.append(self.calculate_FWT(self.Ajj_performance_list, self.Aj_tide_list))
 
-        #紀錄Fail_to_Recourse
-        if len(x[y_pred]) > 0:
-            with pt.no_grad():
-                y_prob: pt.Tensor = model(x[y_pred])
 
-            # print("x[y_pred] : ",x[y_pred])
-            # print("after model update:")
-            # print("y_prob:",y_prob)
-            # print("y_prob[y_prob < 0.5]",y_prob[y_prob < 0.5])
-            recourseFailCnt = len(y_prob[y_prob < 0.5])
-            # print("recourseFailCnt",recourseFailCnt)
-            recourseFailRate = recourseFailCnt / len(x[y_pred])
-            # print("recourseFailRate : ",recourseFailRate)
-            self.failToRecourse.append(recourseFailRate)
-        else:
-            print("no Recourse:")
-            self.failToRecourse.append(-1)
+       #紀錄Fail_to_Recourse
+        with pt.no_grad():
+            y_prob: pt.Tensor = model(sub_sample.x)
+
+        # print("x[y_pred] : ",x[y_pred])
+        # print("after model update:")
+        # print("y_prob:",y_prob)
+        # print("y_prob[y_prob < 0.5]",y_prob[y_prob < 0.5])
+        recourseFailCnt = len(y_prob[y_prob < 0.5])
+        # print("recourseFailCnt",recourseFailCnt)
+        recourseFailRate = recourseFailCnt / len(x[y_pred])
+        # print("recourseFailRate : ",recourseFailRate)
+        self.failToRecourse.append(recourseFailRate)
 
         self.EFTdataframe = self.EFTdataframe.assign(updateRounds = self.EFTdataframe['updateRounds'] + 1)
         self.round = self.round + 1
@@ -201,18 +220,9 @@ class Example9(Helper):
 
         self.PDt.append(parameterL2)
 
-
-
-# loss_list=[]
-# cost=[]
-# cutoff_threshold = 0.9
-
-# # imagineModel = LogisticRegression(train.x.shape[1], 1)
-# # training(imagineModel, train, 50, loss_list)
-# originalModel = copy.deepcopy(model)
-
-# weight = pt.from_numpy(np.ones(train.x.shape[1])) / train.x.shape[1]
-# print("weight: ",weight)
+weight = pt.from_numpy(np.ones(train.x.shape[1])) / train.x.shape[1]
+print("outside: ",weight)
+# weight = pt.from_numpy(np.random.gamma(3,1,20))
 # print(train.x)
 # print(train.y)
 ex9 = Example9(model, pca, train, test, sample)
@@ -221,21 +231,22 @@ ex9.save_directory = DIRECTORY
 ani9 = ex9.animate_all(80)
 ani9.save(os.path.join(DIRECTORY, "ex9.gif"))
 
-print("cost len:",len(cost))
-if len(cost) > 0:
-    avgRecourseCost = sum(cost) / len(cost)
-    print("avgRecourseCost:",avgRecourseCost)
-
 # ex1.draw_PDt()
 ex9.draw_PDt()
 ex9.draw_EFT(80)
 ex9.draw_R20_EFT(80,10)
 ex9.draw_R20_EFT(80,20)
+# ex9.draw_avgRecourseCost()
+ex9.draw_testDataFairRatio()
+# ex9.draw_q3RecourseCost()
+ex9.draw_topkRatioOfDifferentLabel()
+ex9.draw_failToRecourseCompareToNormalModel()
 
 # ex1.draw_EFT(240)
 # ex1.draw_R20_EFT(240,23)
 # ex1.draw_R20_EFT(240,40)
 # ex1.draw_R20_EFT(240,58)
 ex9.draw_Fail_to_Recourse()
+ex9.draw_failToRecourseBeforeModelUpdate()
 display(ex9.EFTdataframe)
 ex9.plot_matricsA()

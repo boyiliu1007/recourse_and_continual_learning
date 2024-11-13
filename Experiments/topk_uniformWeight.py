@@ -10,7 +10,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from Experiment_Helper.helper import Helper, pca
 from Models.logisticRegression import LogisticRegression, training
 from Models.recourseGradient import recourse
-from Config.config import train, test, sample, model
+from Config.config import train, test, sample, model, POSITIVE_RATIO
 from Dataset.makeDataset import Dataset
 
 current_file_path = __file__
@@ -54,21 +54,26 @@ class Example9(Helper):
         # print("x:",x)
 
         with pt.no_grad():
-            y_prob: pt.Tensor = model(x)
+            y_prob: pt.Tensor = self.model(x)
 
         # print("predict: ",y_prob.data)
         y_pred = y_prob.flatten() < 0.5
-        print("~y_pred : ",y_pred)
-        sub_sample = Dataset(x[y_pred], pt.ones((y_pred.count_nonzero(), 1)))
+        # print("~y_pred : ",y_pred)
+        # sub_sample = Dataset(x[y_pred], pt.ones((y_pred.count_nonzero(), 1)))
+        sub_sample = Dataset(x[y_pred], pt.full((y_pred.count_nonzero(), 1),1.0))
 
         # recourse(model, sub_sample, 10,weight,loss_list=[])
-        recourse(model, sub_sample, 200, weight,loss_list=[],threshold=0.5,cost_list=self.avgRecourseCost_list,q3RecourseCost=self.q3RecourseCost)
+        recourse(self.model, sub_sample, 100,weight,loss_list=[],threshold=0.7,cost_list=self.avgRecourseCost_list,q3RecourseCost=self.q3RecourseCost,recourseModelLossList=self.recourseModelLossList)
 
-        x[y_pred] = sub_sample.x
+        # x[y_pred] = sub_sample.x
+        x[y_pred] = pt.tensor(sub_sample.x)
 
         j = np.random.choice(train.x.shape[0], size, False)
-        train.x[j] = x
-        train.y[j, 0] = (~y_pred).float()
+        self.train.x[j] = x
+        # self.train.y[j, 0] = (~y_pred).float()
+        # print("self.train.y: ",self.train.y.shape)
+        # print("y_pred : ",y_pred.shape)
+        self.train.y[j] = (~y_pred).float()
 
         # index = y_prob.flatten() > 0.5
         # k = round(len(index) * 0.4)
@@ -76,31 +81,55 @@ class Example9(Helper):
         # train.y[]
 
         with pt.no_grad():
-          y_prob_all: pt.Tensor = model(train.x)
+          y_prob_all: pt.Tensor = self.model(self.train.x)
+          
+        approvedLabelLength = (y_prob_all > 0.5).count_nonzero()
+        deniedLabelLength = (y_prob_all <= 0.5).count_nonzero()
+        # allDataLength = len(y_prob_all)
+        self.ratioOfDifferentLabel.append(approvedLabelLength.item() / deniedLabelLength.item())
+        
+        # print("y_prob_all[y_prob_all > 0.5] length: ",len(y_prob_all[y_prob_all > 0.5]))
+        # print("approvedLabelLength : ",approvedLabelLength)
+        # print("allDataLength : ",allDataLength)
 
+        #do the topK labeling
         sorted_indices = pt.argsort(y_prob_all[:, 0], dim=0, descending=True)
-        cutoff_index = len(sorted_indices) // 2
+        cutoff_index = int(len(sorted_indices) * POSITIVE_RATIO)
         # print("sorted_indices", sorted_indices)
         mask = pt.zeros_like(y_prob_all)
         mask[sorted_indices[:cutoff_index]] = 1
-        train.y = mask.float()
+        self.train.y = mask.float().squeeze()
+        # print("After squeeze self.train.y: ",self.train.y.shape)
 
         val_data = Dataset(train.x[j], train.y[j])
         self.validation_list.append(val_data)
         sample_model = LogisticRegression(val_data.x.shape[1], 1)
         sample_model.train()
-        training(sample_model, val_data, 30)
+        training(sample_model, val_data, 30,self.test)
         self.Aj_tide_list.append(self.calculate_accuracy(sample_model(val_data.x), val_data.y))
 
         #紀錄新增進來的sample資料
         self.addEFTDataFrame(j)
 
+        #紀錄Fail_to_Recourse
+        # with pt.no_grad():
+        #     y_prob: pt.Tensor = self.model(x[y_pred])
 
-        training(model, train, 50)
+        # # print("x[y_pred] : ",x[y_pred])
+        # # print("after model update:")
+        # # print("y_prob:",y_prob)
+        # # print("y_prob[y_prob < 0.5]",y_prob[y_prob < 0.5])
+        # recourseFailCnt = len(y_prob[y_prob < 0.5])
+        # # print("recourseFailCnt",recourseFailCnt)
+        # recourseFailRate = recourseFailCnt / len(x[y_pred])
+        # # print("recourseFailRate : ",recourseFailRate)
+        # self.failToRecourse.append(recourseFailRate)
+
+        training(self.model, self.train, 50,self.test,loss_list=self.RegreesionModelLossList,val_loss_list=self.RegreesionModel_valLossList,printLoss=True)
         
         #Calculate the proportion of test data labels that remain consistent in the new round of labeling.   
         with pt.no_grad():
-          y_test: pt.Tensor = model(self.test.x)
+          y_test: pt.Tensor = self.model(self.test.x)
         test_trueLabelIdx = test.y.flatten() > 0.5
         #在test data中label為1的index的點
         y_test_trueLabel = y_test[test_trueLabelIdx]
@@ -118,9 +147,9 @@ class Example9(Helper):
         self.memory_plasticity_list.append(self.calculate_FWT(self.Ajj_performance_list, self.Aj_tide_list))
 
 
-        #紀錄Fail_to_Recourse
+        # #紀錄Fail_to_Recourse
         with pt.no_grad():
-            y_prob: pt.Tensor = model(x[y_pred])
+            y_prob: pt.Tensor = self.model(x[y_pred])
 
         # print("x[y_pred] : ",x[y_pred])
         # print("after model update:")
@@ -139,7 +168,7 @@ class Example9(Helper):
         #updated model predict the data with new sample
         data = np.vstack(self.EFTdataframe['x'])
         with pt.no_grad():
-            y_pred = model(pt.tensor(data,dtype = pt.float))
+            y_pred = self.model(pt.tensor(data,dtype = pt.float))
 
         #set prob 0.5 as threshold
         predictValue = deepcopy(y_pred.data)
@@ -193,7 +222,7 @@ ex9 = Example9(model, pca, train, test, sample)
 ex9.save_directory = DIRECTORY
 # ani1 = ex1.animate_all(240)
 ani9 = ex9.animate_all(80)
-ani9.save(os.path.join(DIRECTORY, "ex9.gif"))
+ani9.save(os.path.join(DIRECTORY, "ex9.mp4"))
 
 # ex1.draw_PDt()
 ex9.draw_PDt()
@@ -203,6 +232,8 @@ ex9.draw_R20_EFT(80,20)
 ex9.draw_avgRecourseCost()
 ex9.draw_testDataFairRatio()
 ex9.draw_q3RecourseCost()
+ex9.draw_failToRecourseCompareToNormalModel()
+ex9.draw_topkRatioOfDifferentLabel()
 
 # ex1.draw_EFT(240)
 # ex1.draw_R20_EFT(240,23)
@@ -210,4 +241,9 @@ ex9.draw_q3RecourseCost()
 # ex1.draw_R20_EFT(240,58)
 ex9.draw_Fail_to_Recourse()
 display(ex9.EFTdataframe)
+ex9.draw_failToRecourseBeforeModelUpdate()
+ex9.draw_recourseModelLoss()
+ex9.draw_RegressionModelLoss()
+ex9.draw_Fail_to_Recourse_with_Model_Loss()
 ex9.plot_matricsA()
+ex9.plot_Ajj()

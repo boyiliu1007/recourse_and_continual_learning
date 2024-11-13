@@ -13,7 +13,7 @@ from Experiment_Helper.helper import Helper, pca
 from Models.logisticRegression import LogisticRegression, training
 from Models.recourseGradient import recourse
 # from Models.recourseOriginal import recourse
-from Config.config import train, test, sample, model
+from Config.config import train, test, sample, model, POSITIVE_RATIO
 from Dataset.makeDataset import Dataset
 
 current_file_path = __file__
@@ -103,7 +103,7 @@ class Example9(Helper):
         #   print("y_prob_all :",y_prob_all)
 
         sorted_indices = pt.argsort(y_prob_all[:, 0], dim=0, descending=True)
-        cutoff_index = len(sorted_indices) // 2
+        cutoff_index = int(len(sorted_indices) * POSITIVE_RATIO)
         cutoff_threshold = y_prob_all[sorted_indices[cutoff_index - 1]][0]
         # print("sorted_indices", sorted_indices)
         # print("sorted_indices[cutoff_index] : ",sorted_indices[cutoff_index])
