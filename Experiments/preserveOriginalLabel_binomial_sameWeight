@@ -16,8 +16,8 @@ from Models.recourseGradient import recourse
 # from Models.recourseOriginal import recourse
 # from Models.recourseTest import recourse
 
-# from Config.config import train, test, sample, model
-from Config.MLP_config import train, test, sample, model
+from Config.config import train, test, sample, model
+# from Config.MLP_config import train, test, sample, model
 # from Config.MLP_config import MLP_model
 from Dataset.makeDataset import Dataset
 
