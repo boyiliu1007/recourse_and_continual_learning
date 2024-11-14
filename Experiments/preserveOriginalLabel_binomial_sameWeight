@@ -299,7 +299,7 @@ print("outside: ",weight)
 # cost = []
 # print(train.x)
 # print(train.y)
-BinomialProb = 0.01
+BinomialProb = 0.9
 ex1 = Example1(model, pca, train, test, sample)
 ex1.save_directory = DIRECTORY
 # ani1 = ex1.animate_all(80)
