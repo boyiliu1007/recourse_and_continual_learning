@@ -11,7 +11,8 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from Experiment_Helper.helper import Helper, pca
 from Models.logisticRegression import LogisticRegression, training
-from Models.recourseOriginal import recourse
+# from Models.recourseOriginal import recourse
+from Models.recourseGradient import recourse
 from Config.config import train, test, sample, model, POSITIVE_RATIO
 from Dataset.makeDataset import Dataset
 
@@ -57,15 +58,15 @@ class Example9(Helper):
         # print("x:",x)
 
         with pt.no_grad():
-            y_prob: pt.Tensor = model(x)
+            y_prob: pt.Tensor = self.model(x)
 
         # print("predict: ",y_prob.data)
         y_pred = y_prob.flatten() < 0.5
         print("~y_pred : ",y_pred)
         sub_sample = Dataset(x[y_pred], pt.ones((y_pred.count_nonzero(), 1)))
 
-        # recourse(model, sub_sample, 10,weight,loss_list=[])
-        recourse(model, sub_sample, 10)
+        recourse(self.model, sub_sample, 100,weights,loss_list=[],threshold=0.9,cost_list=self.avgRecourseCost_list,q3RecourseCost=self.q3RecourseCost,recourseModelLossList=self.recourseModelLossList)
+        # recourse(model, sub_sample, 10,threshold=0.5)
 
         x[y_pred] = sub_sample.x
 
@@ -84,7 +85,7 @@ class Example9(Helper):
 
         sorted_indices = pt.argsort(y_prob_all[:, 0], dim=0, descending=True)
         cutoff_index = int(len(sorted_indices) * POSITIVE_RATIO)
-        print("sorted_indices", sorted_indices)
+        # print("sorted_indices", sorted_indices)
         mask = pt.zeros_like(y_prob_all)
         mask[sorted_indices[:cutoff_index]] = 1
         train.y = mask.float()

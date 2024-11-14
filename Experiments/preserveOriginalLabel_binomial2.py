@@ -71,24 +71,36 @@ class Example1(Helper):
         # print("before binomial",recourseIndex)
         recourseIndex[recourseIndex == True] = pt.from_numpy(binomialData)
         # print("binomial y_pred",y_pred)
-        # print("binomial recourseIndex",recourseIndex)
+        print("binomial recourseIndex",recourseIndex)
         sub_sample = Dataset(x[recourseIndex], pt.full((recourseIndex.count_nonzero(), 1),1.0))
 
         # print("do the recourse")
         # print("len subsample",len(sub_sample))
         # recourse(model, sub_sample, 10,weight,loss_list=[])
         if len(sub_sample) > 0:
-            recourse(model, sub_sample, 10,threshold=0.9)
+            recourse(model, sub_sample, 120,threshold=0.9,loss_list=[])
 
             # print("sub_sample x:",sub_sample.x)
             # print("sub_sample y:",sub_sample.y)
-            test = deepcopy(x)
+            # test = deepcopy(x)
             # print("x : ",test)
 
             x[recourseIndex] = sub_sample.x
 
             # print("after recourse")
             # print("check eq :",pt.eq(test,x))
+        else:
+            a = deepcopy(x)
+            b = Dataset(a[y_pred], pt.full((y_pred.count_nonzero(), 1),1.0))
+            print("b.x : ",len(b.x))
+            print("b.y : ",len(b.y))
+            recourse(model, b, 120,threshold=0.9,loss_list=[])
+            a[y_pred] = b.x
+            with pt.no_grad():
+                y_prob: pt.Tensor = model(a[y_pred])
+            print("Before model update : ")
+            print("y_prob:",y_prob)
+            print("y_prob[y_prob < 0.5]",y_prob[y_prob < 0.5])
 
         j = np.random.choice(train.x.shape[0], size, False)
         train.x[j] = x
@@ -98,6 +110,11 @@ class Example1(Helper):
         # k = round(len(index) * 0.4)
         # index = y_prob[index].numpy().argpartition(k)
         # train.y[]
+        # with pt.no_grad():
+        #     y_prob: pt.Tensor = model(a[y_pred])
+        # print("Before model update : ")
+        # print("y_prob:",y_prob)
+        # print("y_prob[y_prob < 0.5]",y_prob[y_prob < 0.5])
 
         val_data = Dataset(train.x[j], train.y[j])
         self.validation_list.append(val_data)
@@ -121,18 +138,18 @@ class Example1(Helper):
 
 
         #紀錄Fail_to_Recourse
-        if len(x[y_pred]) > 0:
+        if len(x[recourseIndex]) > 0:
             with pt.no_grad():
-                y_prob: pt.Tensor = model(x[y_pred])
+                y_prob: pt.Tensor = model(x[recourseIndex])
 
-            # print("x[y_pred] : ",x[y_pred])
+            # print("x[recourseIndex] : ",x[recourseIndex])
             # print("after model update:")
             # print("y_prob:",y_prob)
             # print("y_prob[y_prob < 0.5]",y_prob[y_prob < 0.5])
             recourseFailCnt = len(y_prob[y_prob < 0.5])
-            # print("recourseFailCnt",recourseFailCnt)
-            recourseFailRate = recourseFailCnt / len(x[y_pred])
-            # print("recourseFailRate : ",recourseFailRate)
+            print("recourseFailCnt",recourseFailCnt)
+            recourseFailRate = recourseFailCnt / len(x[recourseIndex])
+            print("recourseFailRate : ",recourseFailRate)
             self.failToRecourse.append(recourseFailRate)
         else:
             print("no Recourse:")
@@ -194,10 +211,11 @@ class Example1(Helper):
 # print(train.x)
 # print(train.y)
 BinomialProb = 0.01
-ex1 = Example1(MLP_model, pca, train, test, sample)
+ex1 = Example1(model, pca, train, test, sample)
 ex1.save_directory = DIRECTORY
 
-ani1 = ex1.animate_all(80)
+ani1 = ex1.animate_all(80)        
+# ani1 = ex1.animate_all(200)
 ani1.save(os.path.join(DIRECTORY, "ex1.mp4"))
 
 # ex1.draw_PDt()
@@ -205,7 +223,12 @@ ex1.draw_PDt()
 ex1.draw_EFT(80)
 ex1.draw_R20_EFT(80,10)
 ex1.draw_R20_EFT(80,20)
-# ex1.draw_R20_EFT(80,58)
+ex1.draw_R20_EFT(80,58)
+
+# ex1.draw_EFT(200)
+# ex1.draw_R20_EFT(200,40)
+# ex1.draw_R20_EFT(200,60)
+
 ex1.draw_Fail_to_Recourse()
 display(ex1.EFTdataframe)
 ex1.plot_matricsA()
