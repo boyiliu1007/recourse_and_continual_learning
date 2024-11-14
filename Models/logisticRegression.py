@@ -40,6 +40,8 @@ def training(model: nn.Module, dataset: Dataset, max_epochs: int,testDataset: Da
             outputs = model(X_batch).squeeze()
             # print("logistic Regression outputs: ",outputs)
             # optimizer.zero_grad()
+            # print(f'outputs:{outputs.shape}')
+            # print(f'Y_batch:{Y_batch.shape}')
             loss = criterion(outputs, Y_batch)
             running_loss += loss.item() * X_batch.size(0)
             # print("logistic Regression loss: ",loss)
