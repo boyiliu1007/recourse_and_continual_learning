@@ -11,11 +11,11 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from Experiment_Helper.helper import Helper, pca
 from Models.logisticRegression import LogisticRegression, training
 from Models.synapticIntelligence import continual_training
-from Models.recourseOriginal import recourse
+from Models.recourseGradient import recourse
 from Config.continual_config import train, test, sample, si, POSITIVE_RATIO
 from Dataset.makeDataset import Dataset
 
-LAMBDA = 0.1
+LAMBDA = 0.001
 
 current_file_path = __file__
 current_directory = os.path.dirname(current_file_path)
@@ -51,13 +51,13 @@ class Example9_Continual_Learning(Helper):
         # print(weights,bias)
 
 
-        size = train.x.shape[0] // 10
+        size = train.x.shape[0] // 4
         i = np.random.choice(sample.x.shape[0], size, False)
         x = sample.x[i]
         # print("x:",x)
 
         with pt.no_grad():
-            y_prob: pt.Tensor = model(x)
+            y_prob: pt.Tensor = self.model(x)
 
         # print("predict: ",y_prob.data)
         y_pred = y_prob.flatten() < 0.5
@@ -65,14 +65,16 @@ class Example9_Continual_Learning(Helper):
         sub_sample = Dataset(x[y_pred], pt.ones((y_pred.count_nonzero(), 1)))
 
         # recourse(model, sub_sample, 10,weight,loss_list=[])
-        recourse(model, sub_sample, 10, threshold = 0.6)
+        recourse(self.model, sub_sample, 10, pt.from_numpy(np.ones(train.x.shape[1])) / train.x.shape[1], threshold=0.6, cost_list = self.avgRecourseCost_list, q3RecourseCost = self.q3RecourseCost, recourseModelLossList = self.recourseModelLossList)
 
         x[y_pred] = sub_sample.x
 
+
         j = np.random.choice(train.x.shape[0], size, False)
-        train.x[j] = x
+        self.train.x[j] = x
         with pt.no_grad():
-            train.y[j, 0] = (model(x).flatten() > 0.5).float()
+            self.train.y[j] = (self.model(x).flatten() > 0.5).float()
+
         # print("train.y[j, 0] : ",train.y[j, 0])
         # with pt.no_grad():
         #     tensor_list = model(train.x[j]).tolist()
@@ -90,12 +92,9 @@ class Example9_Continual_Learning(Helper):
 
         # fail to recourse on Label
         with pt.no_grad():
-            y_prob_l: pt.Tensor = model(x[y_pred])
+            y_prob_l: pt.Tensor = self.model(x[y_pred])
 
-        # print("x[y_pred] : ",x[y_pred])
-        # print("after model update:")
-        # print("y_prob:",y_prob)
-        # print("y_prob[y_prob < 0.5]",y_prob[y_prob < 0.5])
+        
         recourseFailCnt = len(y_prob_l[y_prob_l < 0.5])
         print("recourseFailCnt",recourseFailCnt, "len(x[y_pred])",len(x[y_pred]))
         if len(x[y_pred]) == 0:
@@ -106,44 +105,48 @@ class Example9_Continual_Learning(Helper):
         self.failToRecourseOnLabel.append(recourseFailRate)
 
         with pt.no_grad():
-          y_prob_all: pt.Tensor = model(train.x)
+          y_prob_all: pt.Tensor = self.model(self.train.x)
 
         # top 50% 
-        y_copy = train.y.clone().detach().squeeze()
         sorted_indices = pt.argsort(y_prob_all[:, 0], dim=0, descending=True)
         cutoff_index = int(len(sorted_indices) * POSITIVE_RATIO)
         # print("sorted_indices", sorted_indices)
         mask = pt.zeros_like(y_prob_all)
         mask[sorted_indices[:cutoff_index]] = 1
-        train.y = mask.float()
+        self.train.y = mask.float().squeeze()
         
 
-        val_data = Dataset(train.x[j], train.y[j])
+        val_data = Dataset(self.train.x[j], self.train.y[j])
         self.validation_list.append(val_data)
         sample_model = LogisticRegression(val_data.x.shape[1], 1)
         sample_model.train()
-        training(sample_model, val_data, 30)
+        print(val_data.x.shape, val_data.y.shape)
+        training(sample_model, val_data, 30, self.test)
         self.Aj_tide_list.append(self.calculate_accuracy(sample_model(val_data.x), val_data.y))
 
         #紀錄新增進來的sample資料
         self.addEFTDataFrame(j)
 
-        continual_training(self.si, train, 50, lambda_ = LAMBDA)
+        if(self.jsd_list == []):
+            continual_training(self.si, self.train, 50, lambda_ = 0)
+        else:
+            continual_training(self.si, self.train, 50, lambda_ = 0.0001/(self.jsd_list[-1]))
 
-        self.si.update_omega(train, nn.BCELoss())
+        self.cnt += 1
+        self.si.update_omega(self.train, nn.BCELoss())
         self.si.consolidate(3)
 
         # calculate the overall accuracy
-        self.overall_acc_list.append(self.calculate_AA(model, self.validation_list))
+        self.overall_acc_list.append(self.calculate_AA(self.model, self.validation_list, 3))
         # evaluate memory stability
-        self.memory_stability_list.append(self.calculate_BWT(model, self.validation_list, self.Ajj_performance_list))
+        self.memory_stability_list.append(self.calculate_BWT(self.model, self.validation_list, self.Ajj_performance_list, 3))
         # evaluate learning plasticity
-        self.memory_plasticity_list.append(self.calculate_FWT(self.Ajj_performance_list, self.Aj_tide_list))
+        self.memory_plasticity_list.append(self.calculate_FWT(self.Ajj_performance_list, self.Aj_tide_list, 3))
 
 
         #紀錄Fail_to_Recourse on Model
         with pt.no_grad():
-            y_prob: pt.Tensor = model(x[y_pred])
+            y_prob: pt.Tensor = self.model(x[y_pred])
 
         # print("x[y_pred] : ",x[y_pred])
         # print("after model update:")
@@ -165,7 +168,7 @@ class Example9_Continual_Learning(Helper):
         #updated model predict the data with new sample
         data = np.vstack(self.EFTdataframe['x'])
         with pt.no_grad():
-            y_pred = model(pt.tensor(data,dtype = pt.float))
+            y_pred = self.model(pt.tensor(data,dtype = pt.float))
 
         #set prob 0.5 as threshold
         predictValue = deepcopy(y_pred.data)
@@ -198,7 +201,7 @@ class Example9_Continual_Learning(Helper):
 
         # display(self.EFTdataframe)
         #calculate the PDt
-        modelParams = list(model.parameters())
+        modelParams = list(self.model.parameters())
         modelParameter = np.concatenate((weights,bias))
         resultParameter = np.concatenate((modelParams[0].data.reshape(-1),modelParams[1].data))
         # print("Before update: ")

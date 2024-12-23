@@ -19,11 +19,12 @@ import numpy as np
 from numpy.typing import NDArray
 from sklearn.neighbors import KernelDensity
 from scipy.spatial.distance import jensenshannon
+from tqdm import tqdm
 
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from Config.config import test, train, sample
+from Config.continual_config import test, train, sample
 from Models.synapticIntelligence import SynapticIntelligence
 
 pca = PCA(2).fit(train.x)
@@ -87,6 +88,7 @@ class Helper:
         self.save_directory = None
 
         self.testacc = []
+        self.cnt = 0
 
     # def draw_proba_hist(self, ax: Axes | None = None, *, label: bool = False):
     def draw_proba_hist(self, ax: Axes = None, *, label: bool = False):
@@ -261,7 +263,8 @@ class Helper:
 
             if frame == 0:
                 return ()
-
+            print(self.train.x.shape)
+            print(self.train.y.shape)
             self.update(self.model, self.train, self.sample)
 
             y = test.y.flatten()
@@ -611,53 +614,76 @@ class Helper:
         return 0
       accuracy = sum(correct_predictions) / len(correct_predictions)
       return accuracy
+    
+    def _weight_func(self, x):
+        return x*x*x
+    
+    def _get_weight(self, observe_range):
+        weights = []
+        for i in range (1, observe_range + 1):
+            weights.append(self._weight_func(i))
 
-    def calculate_AA(self, kth_model: nn.Module, jth_data_after_recourse: list):
+        sum = 0
+        for i in weights:
+            sum += i
+        return [w / sum for w in weights]
+
+    def calculate_AA(self, kth_model: nn.Module, jth_data_after_recourse: list, rangenum):
       if jth_data_after_recourse:
         kth_model.eval()
         sum = 0
-
+        weights = self._get_weight(rangenum)
+        
+        if(len(jth_data_after_recourse) < rangenum):
+            return 0
+        
         # do each historical task
-        for j in jth_data_after_recourse:
-          pred = kth_model(j.x)
-          acc = self.calculate_accuracy(pred, j.y)
+        for j in range(-1, -rangenum - 1, -1):
+          pred = kth_model(jth_data_after_recourse[j].x)
+          acc = self.calculate_accuracy(pred, jth_data_after_recourse[j].y) * weights[j]
           self.testacc.append(acc)
           sum += acc
 
         self.testacc.append('|')
-        return sum / len(jth_data_after_recourse)
+        return sum
 
       print("jth_data_after_recourse cannot be empty")
       return None
 
-    def calculate_BWT(self, kth_model: nn.Module, jth_data_after_recourse, Ajj_performance_list):
-      kth_model.eval()
-      sum = 0
+    def calculate_BWT(self, kth_model: nn.Module, jth_data_after_recourse, Ajj_performance_list, rangenum):
+        kth_model.eval()
+        sum = 0
+        weights = self._get_weight(rangenum - 1)
 
-      for i in range (0, len(jth_data_after_recourse)):
-        # if is the last loop, calculate A(j,j) and store it
-        if i == len(jth_data_after_recourse) - 1:
-          pred = kth_model(jth_data_after_recourse[i].x)
-          Ajj_performance_list.append(self.calculate_accuracy(pred, jth_data_after_recourse[-1].y))
-        # else we calculate A(k,j) - A(j,j)
-        else:
-          pred = kth_model(jth_data_after_recourse[i].x)
-          acc = self.calculate_accuracy(pred, jth_data_after_recourse[i].y) - Ajj_performance_list[i]
-          sum += acc
+        for i in range (0, len(jth_data_after_recourse)):
+            # if is the last loop, calculate A(j,j) and store it
+            if i == len(jth_data_after_recourse) - 1:
+                pred = kth_model(jth_data_after_recourse[i].x)
+                Ajj_performance_list.append(self.calculate_accuracy(pred, jth_data_after_recourse[-1].y))
+            # else we calculate A(k,j) - A(j,j)
+            else:
+                if(len(jth_data_after_recourse) - rangenum <= i and i < len(jth_data_after_recourse) - 1):
+                    pred = kth_model(jth_data_after_recourse[i].x)
+                    acc = self.calculate_accuracy(pred, jth_data_after_recourse[i].y) - Ajj_performance_list[i]
+                    acc = acc * weights[i - len(jth_data_after_recourse) + rangenum]
+                    sum += acc  
 
-      if len(jth_data_after_recourse) == 1:
+        if len(jth_data_after_recourse) < rangenum:
+            return 0
+        
         return sum
-      return sum / (len(jth_data_after_recourse) - 1)
 
-    def calculate_FWT(self, Ajj_performance_list, Aj_tide_list):
+    def calculate_FWT(self, Ajj_performance_list, Aj_tide_list, rangenum):
       sum = 0
-
-      for i in range(1, len(Ajj_performance_list)):
-        sum +=  Ajj_performance_list[i] - Aj_tide_list[i]
+      if(len(Aj_tide_list) < rangenum):
+          return 0
+      
+      weights = self._get_weight(rangenum - 1)
+      for i in range(-1, -rangenum, -1):
+        sum +=  (Ajj_performance_list[i] - Aj_tide_list[i]) * weights[i]
         # print(Ajj_performance_list[i], Aj_tide_list[i])
-      if len(Aj_tide_list) == 1:
-        return sum
-      return sum / (len(Aj_tide_list) - 1)
+      
+      return sum
 
     def plot_matricsA(self):
       # Create a figure and subplots
@@ -746,4 +772,44 @@ class Helper:
     def update(self, model: nn.Module, train: Dataset, sample: Dataset):
         raise NotImplementedError()
     
+    
+    def findDiverse(self, points, k):
+        if k == 1:
+            return [0]
+        if k >= len(points):
+            return list(range(len(points)))
+
+        # generate the distance matrix
+        differences = points.unsqueeze(1) - points.unsqueeze(0)
+        distances = pt.norm(differences, dim=2)
+
+        chosen = []
+        chosen.append(0)
+        nums = len(points)
+        
+        # find k disperse point
+        for _ in tqdm(range(1, k), desc="Progress"):
+            pth_min = 0
+            choose = 1
+            
+            # find the point that has the largest minimum distance to the chosen points
+            for i in range(1, nums):
+                if i in chosen:
+                    continue
+                min = distances[i][chosen[0]]
+                for j in chosen:
+                    if i == j:
+                        continue
+                    if distances[i][j] < min:
+                        min = distances[i][j]
+                if min > pth_min:
+                    pth_min = min
+                    choose = i
+            
+            chosen.append(choose)
+
+        return chosen
+                    
+            
+                
     

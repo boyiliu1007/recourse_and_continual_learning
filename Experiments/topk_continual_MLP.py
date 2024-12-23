@@ -12,9 +12,11 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from Experiment_Helper.helper import Helper, pca
 from Models.MLP import MLP, training
 from Models.synapticIntelligence import continual_training
-from Models.recourseOriginal import recourse
+from Models.recourseGradient import recourse
 from Config.continual_MLP_config import train, test, sample, si, POSITIVE_RATIO
 from Dataset.makeDataset import Dataset
+
+LAMBDA = 0.001
 
 current_file_path = __file__
 current_directory = os.path.dirname(current_file_path)
@@ -65,14 +67,14 @@ class Example9_Continual_Learning(Helper):
         sub_sample = Dataset(x[y_pred], pt.ones((y_pred.count_nonzero(), 1)))
 
         # recourse(model, sub_sample, 10,weight,loss_list=[])
-        recourse(model, sub_sample, 10, threshold = 0.6)
-
+        recourse(self.model, sub_sample, 10, pt.from_numpy(np.ones(train.x.shape[1])) / train.x.shape[1], threshold=0.6, cost_list = self.avgRecourseCost_list, q3RecourseCost = self.q3RecourseCost, recourseModelLossList = self.recourseModelLossList)
+        
         x[y_pred] = sub_sample.x
 
         j = np.random.choice(train.x.shape[0], size, False)
         train.x[j] = x
         with pt.no_grad():
-            train.y[j, 0] = (model(x).flatten() > 0.5).float()
+            train.y[j] = (model(x).flatten() > 0.5).float()
 
         # index = y_prob.flatten() > 0.5
         # k = round(len(index) * 0.4)
@@ -93,13 +95,13 @@ class Example9_Continual_Learning(Helper):
         self.validation_list.append(val_data)
         sample_model = MLP(val_data.x.shape[1], 1)
         sample_model.train()
-        training(sample_model, val_data, 30)
+        training(sample_model, val_data, 30, self.test)
         self.Aj_tide_list.append(self.calculate_accuracy(sample_model(val_data.x), val_data.y))
 
         #紀錄新增進來的sample資料
         self.addEFTDataFrame(j)
 
-        continual_training(self.si, train, 50, lambda_ = 0.01)
+        continual_training(self.si, train, 50, lambda_ = LAMBDA)
 
         self.si.update_omega(train, nn.BCELoss())
         self.si.consolidate()

@@ -10,7 +10,9 @@ from Models.logisticRegression import training
 from Models.synapticIntelligence import SynapticIntelligence, continual_training
 
 POSITIVE_RATIO = 0.5
-train, test, sample = make_dataset(100, 100, 2000, POSITIVE_RATIO, 'synthetic')
+#200 250 5000
+train, test, sample = make_dataset(1000, 250, 5000,POSITIVE_RATIO, 'synthetic')
+
 model = LogisticRegression(train.x.shape[1], 1)
 loss_list = []
 criterion = nn.BCELoss()
