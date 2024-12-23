@@ -38,10 +38,13 @@ def training(model: nn.Module, dataset: Dataset, max_epochs: int,testDataset: Da
         for X_batch,Y_batch in train_loader:
             optimizer.zero_grad()
             outputs = model(X_batch).squeeze()
+            # if dimension of outputs != dimension of Y_batch, then unsqueeze outputs
+            if outputs.dim() != Y_batch.dim():
+                outputs = outputs.unsqueeze(-1)
+
             # print("logistic Regression outputs: ",outputs)
             # optimizer.zero_grad()
-            # print(f'outputs:{outputs.shape}')
-            # print(f'Y_batch:{Y_batch.shape}')
+           
             loss = criterion(outputs, Y_batch)
             running_loss += loss.item() * X_batch.size(0)
             # print("logistic Regression loss: ",loss)
@@ -60,6 +63,8 @@ def training(model: nn.Module, dataset: Dataset, max_epochs: int,testDataset: Da
                 # outputs = model(testDataset.x)
                 # validloss = criterion(outputs,testDataset.y)
                 outputs = model(X_batch).squeeze()
+                if outputs.dim() != Y_batch.dim():
+                    outputs = outputs.unsqueeze(-1)
                 validLoss = criterion(outputs,Y_batch)
                 val_loss += validLoss.item() * X_batch.size(0)
         

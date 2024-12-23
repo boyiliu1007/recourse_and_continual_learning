@@ -1,6 +1,7 @@
 import torch as pt
 from torch import nn, optim
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
+
 
 # SI class to manage parameter importance
 class SynapticIntelligence:
@@ -22,6 +23,8 @@ class SynapticIntelligence:
         for inputs, labels in train:
             self.model.zero_grad()
             outputs = self.model(inputs)
+            if outputs.dim() != labels.dim():
+                outputs = outputs.squeeze()
             loss = criterion(outputs, labels)
             loss.backward() # compute gradients
             for name, param in self.model.named_parameters():
@@ -71,6 +74,13 @@ class SynapticIntelligence:
             self.prev_params[name] = param.data.clone()
             self.param_updates[name].zero_()
 
+    # def consolidate(self):
+    #     for name, param in self.model.named_parameters():
+    #         delta = param.data - self.prev_params[name]
+    #         self.omega[name] += self.param_updates[name] / (delta ** 2 + self.epsilon)
+    #         self.prev_params[name] = param.data.clone()
+    #         self.param_updates[name].zero_()
+
     def compute_si_loss(self, lambda_):
         si_loss = 0
         for name, param in self.model.named_parameters():
@@ -84,19 +94,37 @@ class SynapticIntelligence:
 def continual_training(si: SynapticIntelligence, dataset: Dataset, max_epochs: int, loss_list = None, lambda_ = 0.5):
     loss: pt.Tensor
     criterion = nn.BCELoss()
-    optimizer = optim.Adam(si.model.parameters(), 0.1)
+    optimizer = optim.Adam(si.model.parameters(), 0.1,weight_decay=0.001)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=0.1)
     si.model.train()
-    epochCount = 0
+    epoch_loss = []
+    train_loader = DataLoader(dataset, batch_size=64, shuffle=True)
+    
     for _ in range(max_epochs):
-        optimizer.zero_grad()
-        outputs = si.model(dataset.x)
-        loss = criterion(outputs, dataset.y)
-        epochCount += 1
-        loss += si.compute_si_loss(lambda_) * 0.005 # 0.005 is a hyperparameter used to scale the SI loss
-        loss.backward()
-        optimizer.step()
-        if loss_list is not None:
-            loss_list.append(loss.item())
+        running_loss = 0.0
+        for X_batch,Y_batch in train_loader:
+            optimizer.zero_grad()
+            outputs = si.model(X_batch)
+            outputs = outputs.squeeze()
+            if outputs.dim() != Y_batch.dim():
+                    outputs = outputs.unsqueeze(-1)
+            loss = criterion(outputs, Y_batch)
+            loss += si.compute_si_loss(lambda_) * 0.005 # 0.005 is a hyperparameter used to scale the SI loss
+            running_loss += loss.item() * X_batch.size(0)
+            loss.backward()
+            optimizer.step()
+            if loss_list is not None:
+                loss_list.append(loss.item())
+        
+        scheduler.step()
+        train_loss = running_loss / len(train_loader.dataset)
+        epoch_loss.append(train_loss)
+
+        if ( ( (_+1) % 15 == 0) | (_ == 0) ) :
+            print(f"Epoch {_+1}/{max_epochs}, Loss: {train_loss:.4f}, LR: {optimizer.param_groups[0]['lr']:.6f}")
+
+
+
 
 
 

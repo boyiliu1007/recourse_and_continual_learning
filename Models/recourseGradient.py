@@ -64,7 +64,8 @@ def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.T
         if loss_list is not None:
             loss_list.append(loss.item())
     r_model.eval()
-    recourseModelLossList.append(loss.item())
+    if(recourseModelLossList is not None):
+        recourseModelLossList.append(loss.item())
 
     with pt.no_grad():
         recourseCostLimit = 100
@@ -102,7 +103,10 @@ def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.T
                 # cost_list.append(L2_cost.item())
                 # print("Recourse cost: ",L2_cost.item())
             # print("After Recourse",dataset.x)
-            avgRecourseCost /= len(cost)
+            if len(cost) == 0:
+                avgRecourseCost = -1
+            else:
+                avgRecourseCost /= len(cost)
             if q3RecourseCost is not None:
                 # print("recourseCostList :",recourseCostList)
                 # print("q3: ",np.quantile(recourseCostList,0.75))
@@ -118,9 +122,9 @@ def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.T
         #     dataset.x = x_hat
     # draw_statistic(loss_list,mode='loss')
     
-    plt.figure()
-    plt.plot(loss_list)
-    plt.xlabel('Round')
-    plt.ylabel('loss')
-    plt.title('loss')
-    plt.savefig('GradientRecourse_loss_init.png')
+    # plt.figure()
+    # plt.plot(loss_list)
+    # plt.xlabel('Round')
+    # plt.ylabel('loss')
+    # plt.title('loss')
+    # plt.savefig('GradientRecourse_loss_init.png')
