@@ -105,7 +105,6 @@ def make_dataset(train: int, test: int, sample: int, positive_ratio: float = 0.5
         x = pt.tensor(X, dtype=pt.float).clone().detach()
         y = pt.tensor(Y, dtype=pt.float).clone().detach()
         
-        
 
     #do the dataset slice
     i_train = np.s_[:train]

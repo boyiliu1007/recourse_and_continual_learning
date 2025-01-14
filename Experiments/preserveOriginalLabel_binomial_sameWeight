@@ -202,11 +202,11 @@ class Example1(Helper):
         # print("testDataConsistentRatio : ",testDataConsistentRatio)
 
         # calculate the overall accuracy
-        self.overall_acc_list.append(self.calculate_AA(model, self.validation_list))
+        self.overall_acc_list.append(self.calculate_AA(model, self.validation_list, 3))
         # evaluate memory stability
-        self.memory_stability_list.append(self.calculate_BWT(model, self.validation_list, self.Ajj_performance_list))
+        self.memory_stability_list.append(self.calculate_BWT(model, self.validation_list, self.Ajj_performance_list, 3))
         # evaluate memory plasticity
-        self.memory_plasticity_list.append(self.calculate_FWT(self.Ajj_performance_list, self.Aj_tide_list))
+        self.memory_plasticity_list.append(self.calculate_FWT(self.Ajj_performance_list, self.Aj_tide_list, 3))
 
 
         # #紀錄Fail_to_Recourse

@@ -109,7 +109,7 @@ def continual_training(si: SynapticIntelligence, dataset: Dataset, max_epochs: i
             if outputs.dim() != Y_batch.dim():
                     outputs = outputs.unsqueeze(-1)
             loss = criterion(outputs, Y_batch)
-            loss += si.compute_si_loss(lambda_) * 0.005 # 0.005 is a hyperparameter used to scale the SI loss
+            loss += si.compute_si_loss(lambda_)  # 0.005 is a hyperparameter used to scale the SI loss
             running_loss += loss.item() * X_batch.size(0)
             loss.backward()
             optimizer.step()
