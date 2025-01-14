@@ -41,17 +41,14 @@ class Exp2(Helper):
 
         #randomly select from self.sample with size of train and label it with model
         self.train, isNewList = update_train_data(self.train, self.sample, self.model, 'mixed')
-        num_false = (isNewList == False).sum().item()
-        num_true = (isNewList == True).sum().item()
-        print(f"Number of false: {num_false}")
-        print(f"Number of true: {num_true}")
 
-        # find training data with label 0 and select 1/5 of them
+        # find training data with label 0 and select 1/2 of them
+        recourse_num = 0.5
         data, labels = self.train.x, self.train.y
         label_0_indices = pt.where(labels == 0)[0]
         shuffled_indices = pt.randperm(len(label_0_indices))
         label_0_indices = label_0_indices[shuffled_indices]
-        num_samples = len(label_0_indices) // 2
+        num_samples = math.floor(len(label_0_indices) * recourse_num)
         selected_indices = label_0_indices[:num_samples]
 
         # perform recourse on the selected subset
@@ -72,7 +69,6 @@ class Exp2(Helper):
         )
         recoursed_data = selected_subset.x
         self.train.x[selected_indices] = recoursed_data
-        # use recourse_data, self.train.x[selected_indices]
 
         # update the labels of D using topk method
         with pt.no_grad():
@@ -87,14 +83,28 @@ class Exp2(Helper):
         # train the model with the updated dataset
         training(self.model, self.train, 50, self.test,loss_list=self.RegreesionModelLossList,val_loss_list=self.RegreesionModel_valLossList,printLoss=True)
 
-        #calculate metrics
-        # TODO: calculate metrics
+        #calculate metrics: ========================================================================
+        #calculate short term accuracy
+        current_data = Dataset(train.x, train.y)
+        self.historyTrainList.append(current_data)
+        self.overall_acc_list.append(self.calculate_AA(model, self.historyTrainList, 4))
+        
+
+        #calculate ftr
+        with pt.no_grad():
+            y_prob: pt.Tensor = self.model(train.x[selected_indices])
+        recourseFailCnt = len(y_prob[y_prob < 0.5])
+        recourseFailRate = recourseFailCnt / len(train.x[selected_indices])
+        self.failToRecourse.append(recourseFailRate)
+
+        #jsd is calculated in helper.py already
 
 def getFunc(x):
     # Function definition
     return math.log(x - 0.9) + 2.5
     
 def getWeights(feature_num, type = 'uniform'):
+    # type can be chosen from uniform, log
     if(type == 'uniform'):
         return pt.from_numpy(np.ones(feature_num)) / feature_num
     elif(type == 'log'):
@@ -105,6 +115,7 @@ def getWeights(feature_num, type = 'uniform'):
         print("type is incorrect at getWeights")
 
 def update_train_data(train, sample, model, type = 'all'):
+    #type can be chosen from none, all, mixed
     if type == 'none':
         return train, pt.empty(0, dtype=pt.bool)
 
@@ -153,4 +164,8 @@ exp2 = Exp2(model, pca, train, test, sample)
 exp2.save_directory = DIRECTORY
 ani1 = exp2.animate_all(80)
 ani1.save(os.path.join(DIRECTORY, "ex2.gif"))
+exp2.overall_acc_list = exp2.overall_acc_list[2:]
 exp2.draw_avgRecourseCost()
+exp2.plot_jsd()
+exp2.draw_Fail_to_Recourse()
+exp2.plot_aac()

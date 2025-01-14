@@ -30,7 +30,6 @@ from Models.synapticIntelligence import SynapticIntelligence
 pca = PCA(2).fit(train.x)
 
 class Helper:
-
     palette = sns.color_palette('muted', 2)
     cmap = ListedColormap(palette)
 
@@ -91,6 +90,7 @@ class Helper:
         self.cnt = 0
         self.avgNewRecourseCostList = []
         self.avgOriginalRecourseCostList = []
+        self.historyTrainList = []
 
     # def draw_proba_hist(self, ax: Axes | None = None, *, label: bool = False):
     def draw_proba_hist(self, ax: Axes = None, *, label: bool = False):
@@ -632,26 +632,27 @@ class Helper:
         return [w / sum for w in weights]
 
     def calculate_AA(self, kth_model: nn.Module, jth_data_after_recourse: list, rangenum):
-      if jth_data_after_recourse:
-        kth_model.eval()
-        sum = 0
-        weights = self._get_weight(rangenum)
+        rangenum -= 1
+        if jth_data_after_recourse:
+            kth_model.eval()
+            sum = 0
+            weights = self._get_weight(rangenum)
         
-        if(len(jth_data_after_recourse) < rangenum):
-            return 0
-        
-        # do each historical task
-        for j in range(-1, -rangenum - 1, -1):
-          pred = kth_model(jth_data_after_recourse[j].x)
-          acc = self.calculate_accuracy(pred, jth_data_after_recourse[j].y) * weights[j]
-          self.testacc.append(acc)
-          sum += acc
+            if(len(jth_data_after_recourse) < rangenum):
+                return 0
+            
+            # do each historical task
+            for j in range(-2, -rangenum - 1, -1):
+                pred = kth_model(jth_data_after_recourse[j].x)
+                acc = self.calculate_accuracy(pred, jth_data_after_recourse[j].y) * weights[j+1]
+                self.testacc.append(acc)
+                sum += acc
 
-        self.testacc.append('|')
-        return sum
+            self.testacc.append('|')
+            return sum
 
-      print("jth_data_after_recourse cannot be empty")
-      return None
+        print("jth_data_after_recourse cannot be empty")
+        return None
 
     def calculate_BWT(self, kth_model: nn.Module, jth_data_after_recourse, Ajj_performance_list, rangenum):
         kth_model.eval()
@@ -721,6 +722,16 @@ class Helper:
       plt.ylabel('Ajj accuracy')
       plt.title('Ajj accuracy')
       plt.savefig(os.path.join(self.save_directory, 'Ajj.png'))
+
+    def plot_aac(self):
+        plt.figure()
+        x_values = range(2, 2 + len(self.overall_acc_list))
+        plt.plot(x_values, self.overall_acc_list)
+        plt.xlabel('Round')
+        plt.ylabel('Short-term Accuracy')
+        plt.title('Short-term Accuracy')
+        plt.savefig(os.path.join(self.save_directory, 'aac.png'))
+        plt.close()
       
     def draw_avgRecourseCost(self):
         # Check if there is any data to plot

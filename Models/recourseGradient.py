@@ -105,5 +105,5 @@ def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.T
             
             cost_list.append(avgRecourseCost.item())
             print("avgRecourseCost cost: ",avgRecourseCost.item())
-            print("avgNewRwcourseCost: ",avgNewRwcourseCost.item())
-            print("avgOriginalRecourseCost ", avgOriginalRecourseCost.item())
+            print("avgNewRwcourseCost: ",avgNewRwcourseCost.item(), newCount)
+            print("avgOriginalRecourseCost ", avgOriginalRecourseCost.item(), len(cost) - newCount)
