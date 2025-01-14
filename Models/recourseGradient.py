@@ -28,7 +28,7 @@ class Recourse(nn.Module):
 
 
 # def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.Tensor | None = None, loss_list: list | None = None):
-def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.Tensor = None, loss_list: list = None,cost_list = None,threshold = 1.0,q3RecourseCost: list = None,recourseModelLossList: list = None):
+def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.Tensor = None, loss_list: list = None,cost_list = None,threshold = 1.0,q3RecourseCost: list = None,recourseModelLossList: list = None, isNew = None):
     loss: pt.Tensor
     r_model = Recourse(dataset.x.shape)
     criterion = nn.HuberLoss()
@@ -70,61 +70,40 @@ def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.T
     with pt.no_grad():
         recourseCostLimit = 100
         recourseLambda = 0.6
-        # dataset.x,cost = r_model(dataset.x)
-        # print("Before recourse:",dataset.x)
         recourseX,cost = r_model(dataset.x)
-        # print("After Recourse",dataset.x)
-        # print("recourseX: ",recourseX)
-        # dataset.x = 
-        # for name, param in r_model.named_parameters():
-        #     print(name, param.data)
-        # print("cost: ",cost)
-         # x_hat,cost = r_model(dataset.x)
         if cost_list is not None:
             avgRecourseCost = 0.0
+            avgOriginalRecourseCost = 0.0
+            avgNewRwcourseCost = 0.0
+            newCount = 0
             recourseCostList = []
-            # print("cost:",cost)
             for idx,t in enumerate(cost):
-                # print("cost: ",t)
+                # if the idx matches isNew then count it as new recoursecost
+                # otherwise not
                 L2_cost = pt.pow(pt.sum((t * weight) * (t * weight)),1/2)
-                # print("Recourse cost: ",L2_cost.item())
-                #Gradient = f(x)' - lambda * cost(x,x') > 0
+                if(isNew[idx]):
+                    newCount += 1
+                    avgNewRwcourseCost += L2_cost
+                else:
+                    avgOriginalRecourseCost += L2_cost
                 a = c_model(recourseX[idx])
-                # print("f(x)':",a)
                 recourseGradient = a -  (1 / recourseLambda) * pt.pow(pt.sum((t * weight) * (t * weight)),1/2)
-                # print("recourse gradient: ",recourseGradient)
-                #set the recourse cost limit
-                # if L2_cost < recourseCostLimit:
                 if recourseGradient >= 0:
-                    # print("pass the limit!")
                     dataset.x[idx] = recourseX[idx]
                 avgRecourseCost += L2_cost
                 recourseCostList.append(L2_cost.item())
-                # cost_list.append(L2_cost.item())
-                # print("Recourse cost: ",L2_cost.item())
-            # print("After Recourse",dataset.x)
             if len(cost) == 0:
                 avgRecourseCost = -1
             else:
                 avgRecourseCost /= len(cost)
+                avgNewRwcourseCost /= newCount
+                avgOriginalRecourseCost /= (len(cost) - newCount)
+                
             if q3RecourseCost is not None:
-                # print("recourseCostList :",recourseCostList)
-                # print("q3: ",np.quantile(recourseCostList,0.75))
                 q3RecourseCost.append(np.quantile(recourseCostList,0.75))
-            
+
             
             cost_list.append(avgRecourseCost.item())
             print("avgRecourseCost cost: ",avgRecourseCost.item())
-            
-        #Recourse cost limit set as 0.35
-        # if L2_cost.item() < 0.3:
-        #     print("pass the cost limit")
-        #     dataset.x = x_hat
-    # draw_statistic(loss_list,mode='loss')
-    
-    # plt.figure()
-    # plt.plot(loss_list)
-    # plt.xlabel('Round')
-    # plt.ylabel('loss')
-    # plt.title('loss')
-    # plt.savefig('GradientRecourse_loss_init.png')
+            print("avgNewRwcourseCost: ",avgNewRwcourseCost.item())
+            print("avgOriginalRecourseCost ", avgOriginalRecourseCost.item())

@@ -24,7 +24,7 @@ from tqdm import tqdm
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from Config.continual_config import test, train, sample
+from Config.config import test, train, sample
 from Models.synapticIntelligence import SynapticIntelligence
 
 pca = PCA(2).fit(train.x)
@@ -89,6 +89,8 @@ class Helper:
 
         self.testacc = []
         self.cnt = 0
+        self.avgNewRecourseCostList = []
+        self.avgOriginalRecourseCostList = []
 
     # def draw_proba_hist(self, ax: Axes | None = None, *, label: bool = False):
     def draw_proba_hist(self, ax: Axes = None, *, label: bool = False):
@@ -138,6 +140,7 @@ class Helper:
                     [f'{h}%' if h else '' for h in height],
                     fontsize='xx-small'
                 )
+        ax.set_ylim(0, 50)
         return fig, ax
 
     #calculate js divergence using training data after pca
@@ -720,13 +723,24 @@ class Helper:
       plt.savefig(os.path.join(self.save_directory, 'Ajj.png'))
       
     def draw_avgRecourseCost(self):
-        if len(self.avgRecourseCost_list) > 0:
+        # Check if there is any data to plot
+        if any(len(lst) > 0 for lst in [self.avgRecourseCost_list, self.avgNewRecourseCostList, self.avgOriginalRecourseCostList]):
             plt.figure()
-            plt.plot(self.avgRecourseCost_list)
+    
+            if len(self.avgRecourseCost_list) > 0:
+                plt.plot(self.avgRecourseCost_list, label='Average Recourse Cost')
+            if len(self.avgNewRecourseCostList) > 0:
+                plt.plot(self.avgNewRecourseCostList, label='Average New Recourse Cost', linestyle='--')
+            if len(self.avgOriginalRecourseCostList) > 0:
+                plt.plot(self.avgOriginalRecourseCostList, label='Average Original Recourse Cost', linestyle='-.')
+            
+            # Add labels, title, legend, and save the figure
             plt.xlabel('Round')
-            plt.ylabel('avgRecourseCost')
-            plt.title('avgRecourseCost')
-            plt.savefig(os.path.join(self.save_directory, 'avgRecourseCost.png'))
+            plt.ylabel('Cost')
+            plt.title('Recourse Cost Comparison')
+            plt.legend()
+            plt.savefig(os.path.join(self.save_directory, 'avgRecourseCostComparison.png'))
+            plt.close()
             
     def draw_testDataFairRatio(self):
         plt.figure()
@@ -809,6 +823,7 @@ class Helper:
             chosen.append(choose)
 
         return chosen
+
                     
             
                 
