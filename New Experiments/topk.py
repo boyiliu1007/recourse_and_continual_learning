@@ -25,7 +25,7 @@ current_file_name = os.path.splitext(current_file_name)[0]
 DIRECTORY = os.path.join(current_directory, f"{current_file_name}_output")
 
 # modified parameters for observations
-THRESHOLD = 0.7
+THRESHOLD = 0.5
 RECOURSENUM = 0.5
 COSTWEIGHT = 'uniform'
 DATASET = dataset
@@ -61,7 +61,6 @@ class Exp2(Helper):
         # perform recourse on the selected subset
         selected_subset = Dataset(data[selected_indices], labels[selected_indices].unsqueeze(1))
         recourse_weight = getWeights(self.train.x.shape[1], COSTWEIGHT)
-        print(isNewList[selected_indices].shape)
         recourse(
             self.model,
             selected_subset,
@@ -111,7 +110,7 @@ class Exp2(Helper):
 
 exp2 = Exp2(model, pca, train, test, sample)
 exp2.save_directory = DIRECTORY
-ani1 = exp2.animate_all(10)
+ani1 = exp2.animate_all(100)
 ani1.save(os.path.join(DIRECTORY, "ex2.gif"))
 exp2.overall_acc_list = exp2.overall_acc_list[2:]
 exp2.draw_avgRecourseCost()
