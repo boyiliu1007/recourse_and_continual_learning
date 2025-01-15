@@ -28,7 +28,7 @@ class Recourse(nn.Module):
 
 
 # def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.Tensor | None = None, loss_list: list | None = None):
-def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.Tensor = None, loss_list: list = None,cost_list = None,threshold = 1.0,q3RecourseCost: list = None,recourseModelLossList: list = None, isNew = None):
+def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.Tensor = None, loss_list: list = None,cost_list = None,threshold = 1.0,q3RecourseCost: list = None,recourseModelLossList: list = None, isNew = None, new_cost_list = None, original_cost_list = None):
     loss: pt.Tensor
     r_model = Recourse(dataset.x.shape)
     criterion = nn.HuberLoss()
@@ -74,7 +74,7 @@ def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.T
         if cost_list is not None:
             avgRecourseCost = 0.0
             avgOriginalRecourseCost = 0.0
-            avgNewRwcourseCost = 0.0
+            avgNewRecourseCost = 0.0
             newCount = 0
             recourseCostList = []
             for idx,t in enumerate(cost):
@@ -83,7 +83,7 @@ def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.T
                 L2_cost = pt.pow(pt.sum((t * weight) * (t * weight)),1/2)
                 if(isNew[idx]):
                     newCount += 1
-                    avgNewRwcourseCost += L2_cost
+                    avgNewRecourseCost += L2_cost
                 else:
                     avgOriginalRecourseCost += L2_cost
                 a = c_model(recourseX[idx])
@@ -96,7 +96,7 @@ def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.T
                 avgRecourseCost = -1
             else:
                 avgRecourseCost /= len(cost)
-                avgNewRwcourseCost /= newCount
+                avgNewRecourseCost /= newCount
                 avgOriginalRecourseCost /= (len(cost) - newCount)
                 
             if q3RecourseCost is not None:
@@ -104,6 +104,8 @@ def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.T
 
             
             cost_list.append(avgRecourseCost.item())
+            original_cost_list.append(avgOriginalRecourseCost.item())
+            new_cost_list.append(avgNewRecourseCost.item())
             print("avgRecourseCost cost: ",avgRecourseCost.item())
-            print("avgNewRwcourseCost: ",avgNewRwcourseCost.item(), newCount)
+            print("avgNewRecourseCost: ",avgNewRecourseCost.item(), newCount)
             print("avgOriginalRecourseCost ", avgOriginalRecourseCost.item(), len(cost) - newCount)
