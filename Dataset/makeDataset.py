@@ -113,6 +113,6 @@ def make_dataset(train: int, test: int, sample: int, positive_ratio: float = 0.5
     d_train = Dataset(x[i_train], y[i_train])
     d_test = Dataset(x[i_test], y[i_test])
     d_sample = Dataset(x[i_sample], y[i_sample])
-    return d_train, d_test, d_sample
+    return d_train, d_test, d_sample, dataset
 
 
