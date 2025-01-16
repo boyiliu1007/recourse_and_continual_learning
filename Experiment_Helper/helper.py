@@ -24,7 +24,10 @@ from tqdm import tqdm
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 from Config.config import test, train, sample
+# from Config.MLP_config import test, train, sample
+
 from Models.synapticIntelligence import SynapticIntelligence
 
 pca = PCA(2).fit(train.x)
@@ -140,7 +143,7 @@ class Helper:
                     [f'{h}%' if h else '' for h in height],
                     fontsize='xx-small'
                 )
-        ax.set_ylim(0, 50)
+        ax.set_ylim(0, 80)
         return fig, ax
 
     #calculate js divergence using training data after pca
@@ -250,7 +253,7 @@ class Helper:
     def animate_all(self, frames: int = 120, fps: int = 10, *, inplace: bool = False):
         fig, (ax0, ax1, ax2) = self.draw_all()
 
-        print("inplace: ",inplace)
+        # print("inplace: ",inplace)
         # model = self.model if inplace else deepcopy(self.model)
         # train = self.train if inplace else deepcopy(self.train)
         # model = self.model

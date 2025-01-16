@@ -11,9 +11,14 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from Experiment_Helper.helper import Helper, pca
 from Experiment_Helper.auxiliary import getWeights, update_train_data, FileSaver
 
+# from Models.MLP import MLP, training
 from Models.logisticRegression import LogisticRegression, training
+
 from Models.recourseGradient import recourse
+
 from Config.config import train, test, sample, model, dataset, POSITIVE_RATIO # modified parameters for observations
+# from Config.MLP_config import train, test, sample, model, dataset, POSITIVE_RATIO # modified parameters for observations
+
 from Dataset.makeDataset import Dataset
 
 
@@ -110,9 +115,17 @@ class Exp2(Helper):
 
 
 exp2 = Exp2(model, pca, train, test, sample)
+DIRECTORY = os.path.join(DIRECTORY,f"{RECOURSENUM}_{THRESHOLD}_{POSITIVE_RATIO}_{COSTWEIGHT}_{DATASET}")
+print(f"DIRECTORY:{DIRECTORY}")
+try:
+    os.makedirs(DIRECTORY, exist_ok=True)
+    print(f"Folder '{DIRECTORY}' is ready.")
+except Exception as e:
+    print(f"An error occurred: {e}")
+    
 exp2.save_directory = DIRECTORY
-ani1 = exp2.animate_all(10)
-ani1.save(os.path.join(DIRECTORY, "ex2.gif"))
+ani1 = exp2.animate_all(100)
+ani1.save(os.path.join(DIRECTORY, "ex2.mp4"))
 exp2.overall_acc_list = exp2.overall_acc_list[2:]
 exp2.draw_avgRecourseCost()
 exp2.plot_jsd()

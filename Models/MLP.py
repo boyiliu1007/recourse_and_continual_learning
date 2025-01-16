@@ -8,8 +8,17 @@ from torch.utils.data import DataLoader
 class MLP(nn.Module):
   def __init__(self, input_dim: int, output_dim: int):
     super().__init__()
+    # self.layers = nn.Sequential(
+    #   nn.Linear(input_dim, 5),
+    #   nn.ReLU(),
+    #   nn.Linear(5, output_dim),
+    #   nn.Sigmoid()
+    # )
+    
     self.layers = nn.Sequential(
-      nn.Linear(input_dim, 5),
+      nn.Linear(input_dim, 10),
+      nn.ReLU(),
+      nn.Linear(10, 5),
       nn.ReLU(),
       nn.Linear(5, output_dim),
       nn.Sigmoid()

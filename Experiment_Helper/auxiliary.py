@@ -24,15 +24,22 @@ def update_train_data(train, sample, model, type = 'all'):
     if type == 'none':
         return train, pt.empty(0, dtype=pt.bool)
 
+    #pick sample randomly from sample pool
     size = train.x.shape[0]
+    # print(f"train.x.shape: {size}")
     sample_indices = pt.randperm(sample.x.shape[0])[:size]
+    # print(f"sample_indices: {sample_indices}")
     sampled_x = sample.x[sample_indices]
+    # print(f"sampled_x: {sampled_x}")
 
 
     if type == 'mixed':
         half_size = size // 2
         retain_indices = pt.randperm(size)[:half_size]
+        # print(f"retain_indices: {retain_indices}")
         modify_indices = pt.tensor([i for i in range(size) if i not in retain_indices])
+        # print(f"modify_indices: {modify_indices}")
+        # print(f"modify_indices.shape: {modify_indices.shape}")
 
         train.x[modify_indices] = sampled_x[:modify_indices.shape[0]]
         with pt.no_grad():
