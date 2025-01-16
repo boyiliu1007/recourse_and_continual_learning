@@ -10,11 +10,12 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from Experiment_Helper.helper import Helper, pca
+from Experiment_Helper.auxiliary import getWeights, update_train_data, FileSaver
 
 from Models.logisticRegression import LogisticRegression, training
 from Models.synapticIntelligence import continual_training
 from Models.recourseGradient import recourse
-from Config.continual_config import train, test, sample, si, POSITIVE_RATIO
+from Config.continual_config import train, test, sample, si, dataset, POSITIVE_RATIO # modified parameters for observations
 from Dataset.makeDataset import Dataset
 
 current_file_path = __file__
@@ -30,6 +31,12 @@ try:
 except Exception as e:
     print(f"An error occurred: {e}")
 
+# modified parameters for observations
+THRESHOLD = 0.7
+RECOURSENUM = 0.5
+COSTWEIGHT = 'uniform'
+DATASET = dataset
+
 class Exp3(Helper):
     '''
     1. perform recourse on dataset D
@@ -42,31 +49,33 @@ class Exp3(Helper):
         self.round += 1
 
         #randomly select from self.sample with size of train and label it with model
-        size = self.train.x.shape[0]
-        sample_indices = pt.randperm(self.sample.x.shape[0])[:size]
-        self.train.x = self.sample.x[sample_indices]
-        with pt.no_grad():
-            y_prob: pt.Tensor = self.model(self.train.x)
-        y_prob = y_prob.squeeze(1)
-        self.train.y = pt.where(y_prob > 0.5, 1.0, 0.0)
-        num_zeros = (self.train.y == 0).sum().item()
-        num_ones = (self.train.y == 1).sum().item()
-        print(f"Number of 0s: {num_zeros}")
-        print(f"Number of 1s: {num_ones}")
+        self.train, isNewList = update_train_data(self.train, self.sample, self.model, 'mixed')
 
         # find training data with label 0 and select 1/5 of them
         data, labels = self.train.x, self.train.y
         label_0_indices = pt.where(labels == 0)[0]
         shuffled_indices = pt.randperm(len(label_0_indices))
         label_0_indices = label_0_indices[shuffled_indices]
-        num_samples = len(label_0_indices) // 5
+        num_samples = math.floor(len(label_0_indices) * RECOURSENUM)
         selected_indices = label_0_indices[:num_samples]
 
         # perform recourse on the selected subset
         selected_subset = Dataset(data[selected_indices], labels[selected_indices].unsqueeze(1))
-        # recourse_weight = pt.from_numpy(np.ones(self.train.x.shape[1])) / self.train.x.shape[1]
-        recourse_weight = pt.from_numpy(getWeights(self.train.x.shape[1]))
-        recourse(self.model, selected_subset, 100,recourse_weight,loss_list=[],threshold=0.5,cost_list=self.avgRecourseCost_list,q3RecourseCost=self.q3RecourseCost,recourseModelLossList=self.recourseModelLossList)
+        recourse_weight = getWeights(self.train.x.shape[1], COSTWEIGHT)
+        recourse(
+            self.model,
+            selected_subset,
+            100,
+            recourse_weight,
+            loss_list=[],
+            threshold=THRESHOLD,
+            cost_list=self.avgRecourseCost_list,
+            q3RecourseCost=self.q3RecourseCost,
+            recourseModelLossList=self.recourseModelLossList,
+            isNew = isNewList[selected_indices],
+            new_cost_list=self.avgNewRecourseCostList,
+            original_cost_list=self.avgOriginalRecourseCostList
+        )
         recoursed_data = selected_subset.x
         self.train.x[selected_indices] = recoursed_data
 
@@ -80,7 +89,7 @@ class Exp3(Helper):
         weights = kde_scores / np.sum(kde_scores)
         sampled_indices = np.random.choice(
             positive_indices.cpu().numpy(),  # Indices to sample from
-            size=self.train.x.shape[0]//2,                          # Number of samples
+            size=math.floor(self.train.x.shape[0] * POSITIVE_RATIO),                          # Number of samples
             replace=False,                   # No replacement
             p=weights                        # Probability weights
         )
