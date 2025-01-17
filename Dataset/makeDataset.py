@@ -54,6 +54,38 @@ def load_credit_default_data():
     
     return X, Y
 
+def load_UCI_credit_default_data():
+    pt.manual_seed(0)
+    np.random.seed(0)
+    df = pd.read_csv('Dataset/UCI_Credit_Card.csv')
+    df = df.sample(frac=1).reset_index(drop=True)
+
+    # df = df.drop(['ID', 'SEX', 'EDUCATION', 'MARRIAGE', 'AGE', 'PAY_0', 'PAY_2', 'PAY_3', 'PAY_4', 'PAY_5', 'PAY_6'], axis = 1)
+    df = df.drop(['ID', 'SEX', 'EDUCATION', 'MARRIAGE', 'AGE'], axis = 1)
+    # print(df)
+    a = df.loc[df["default.payment.next.month"] == 0]
+    scaler = StandardScaler()
+    df.loc[:, df.columns != "default.payment.next.month"] = scaler.fit_transform(df.drop("default.payment.next.month", axis=1))
+    print(df)
+
+    default_df = df.loc[df["default.payment.next.month"] == 1]
+    non_default_df = df.loc[df["default.payment.next.month"] == 0][:6636]
+    # print(f"default_df.shape: {default_df.shape}")
+    # print(f"non_default_df.shape: {non_default_df.shape}")
+    # print(f"fraud_df{fraud_df}")
+    # print(f"non_fraud_df{non_fraud_df}")
+
+    normal_distributed_df = pd.concat([default_df, non_default_df])
+
+    # Shuffle dataframe rows
+    df = normal_distributed_df.sample(frac=1).reset_index(drop=True)
+
+    Y, X = df.iloc[:, 19].values, df.iloc[:, :19].values
+    print(f"X: {X}")
+    print(f"Y: {Y}")
+    
+    return X, Y
+
 def load_german_data():
     df = pd.read_csv('Dataset\german.csv')
     df = df.drop(['Status', 'History', 'Present residence', 'Age', 'Number people'], axis = 1)
@@ -73,7 +105,7 @@ def load_sba_data():
     print(Y.shape)
     return X, Y
 
-DATASETS = ['synthetic', 'credit', 'german', 'sba']
+DATASETS = ['synthetic', 'credit', 'german', 'sba','UCIcredit']
 def make_dataset(train: int, test: int, sample: int, positive_ratio: float = 0.5, dataset: str = 'synthetic'):
     n_samples = train + test + sample
 
@@ -87,6 +119,12 @@ def make_dataset(train: int, test: int, sample: int, positive_ratio: float = 0.5
     
     if dataset == 'credit':
         X, Y = load_credit_default_data()
+        X, Y = X[:n_samples], Y[:n_samples]
+        x = pt.tensor(X, dtype=pt.float).clone().detach()
+        y = pt.tensor(Y, dtype=pt.float).clone().detach()
+    
+    if dataset == 'UCIcredit':
+        X, Y = load_UCI_credit_default_data()
         X, Y = X[:n_samples], Y[:n_samples]
         x = pt.tensor(X, dtype=pt.float).clone().detach()
         y = pt.tensor(Y, dtype=pt.float).clone().detach()
