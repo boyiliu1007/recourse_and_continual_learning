@@ -30,7 +30,7 @@ current_file_name = os.path.splitext(current_file_name)[0]
 DIRECTORY = os.path.join(current_directory, f"{current_file_name}_output")
 
 # modified parameters for observations
-THRESHOLD = 0.5
+THRESHOLD = 0.7
 RECOURSENUM = 0.5
 COSTWEIGHT = 'uniform'
 DATASET = dataset
@@ -98,17 +98,16 @@ class Exp2(Helper):
 
         #calculate metrics: ========================================================================
         #calculate short term accuracy
-        current_data = Dataset(train.x, train.y)
+        current_data = Dataset(self.train.x, self.train.y)
         self.historyTrainList.append(current_data)
-        self.overall_acc_list.append(self.calculate_AA(model, self.historyTrainList, 4))
+        self.overall_acc_list.append(self.calculate_AA(self.model, self.historyTrainList, 4))
         
 
         #calculate ftr
-        with pt.no_grad():
-            y_prob: pt.Tensor = self.model(train.x[selected_indices])
-        recourseFailCnt = len(y_prob[y_prob < 0.5])
-        recourseFailRate = recourseFailCnt / len(train.x[selected_indices])
+        recourseFailCnt = pt.where(self.train.y[selected_indices] == 0)[0].shape[0]
+        recourseFailRate = recourseFailCnt / len(self.train.y[selected_indices])
         self.failToRecourse.append(recourseFailRate)
+        print("recourseFailRate: ",recourseFailRate)
 
         #jsd is calculated in helper.py already
 

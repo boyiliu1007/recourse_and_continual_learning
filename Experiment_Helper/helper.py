@@ -25,10 +25,7 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from Config.config import test, train, sample
-# from Config.MLP_config import test, train, sample
-
-# from Config.continual_config import test, train, sample
+from Config.config import test, train, sampl
 from Models.synapticIntelligence import SynapticIntelligence
 
 pca = PCA(2).fit(train.x)
@@ -95,6 +92,7 @@ class Helper:
         self.avgNewRecourseCostList = []
         self.avgOriginalRecourseCostList = []
         self.historyTrainList = []
+        self.train_size = 0
 
     # def draw_proba_hist(self, ax: Axes | None = None, *, label: bool = False):
     def draw_proba_hist(self, ax: Axes = None, *, label: bool = False):
