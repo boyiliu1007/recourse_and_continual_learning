@@ -7,6 +7,7 @@ import math
 
 import os
 import sys
+import datetime
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from Experiment_Helper.helper import Helper, pca
 from Experiment_Helper.auxiliary import getWeights, update_train_data, FileSaver
@@ -113,17 +114,9 @@ class Exp2(Helper):
 
 
 exp2 = Exp2(model, pca, train, test, sample)
-DIRECTORY = os.path.join(DIRECTORY,f"{RECOURSENUM}_{THRESHOLD}_{POSITIVE_RATIO}_{COSTWEIGHT}_{DATASET}")
-print(f"DIRECTORY:{DIRECTORY}")
-try:
-    os.makedirs(DIRECTORY, exist_ok=True)
-    print(f"Folder '{DIRECTORY}' is ready.")
-except Exception as e:
-    print(f"An error occurred: {e}")
-    
-exp2.save_directory = DIRECTORY
 ani1 = exp2.animate_all(100)
-ani1.save(os.path.join(DIRECTORY, "ex2.mp4"))
+current_time = datetime.datetime.now().strftime("%d-%H-%M")
+ani1.save(os.path.join(DIRECTORY, f"{RECOURSENUM}_{THRESHOLD}_{POSITIVE_RATIO}_{COSTWEIGHT}_{DATASET}_{current_time}.mp4"))
 exp2.overall_acc_list = exp2.overall_acc_list[2:]
 exp2.draw_avgRecourseCost()
 exp2.plot_jsd()
@@ -137,4 +130,4 @@ FileSaver(exp2.failToRecourse,
           exp2.avgRecourseCost_list, 
           exp2.avgNewRecourseCostList, 
           exp2.avgOriginalRecourseCostList
-        ).save_to_csv(RECOURSENUM, THRESHOLD, POSITIVE_RATIO, COSTWEIGHT, DATASET, DIRECTORY)
+        ).save_to_csv(RECOURSENUM, THRESHOLD, POSITIVE_RATIO, COSTWEIGHT, DATASET, current_time, DIRECTORY)

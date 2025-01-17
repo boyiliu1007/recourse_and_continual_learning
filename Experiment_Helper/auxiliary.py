@@ -87,8 +87,7 @@ class FileSaver:
         self.avgNewRecourseCost = avgNewRecourseCost
         self.avgOriginalRecourseCost = avgOriginalRecourseCost
 
-    def save_to_csv(self, recourse_num, threshold, acceptance_rate, cost_weight, dataset, directory = ''):
-        current_time = datetime.datetime.now().strftime("%d-%H-%M")
+    def save_to_csv(self, recourse_num, threshold, acceptance_rate, cost_weight, dataset, current_time, directory = ''):
         filename = f"{recourse_num}_{threshold}_{acceptance_rate}_{cost_weight}_{dataset}_{current_time}.csv"
         if directory:
             directory = directory.rstrip('/') + '/'

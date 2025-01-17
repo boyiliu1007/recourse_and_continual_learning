@@ -114,8 +114,7 @@ def make_dataset(train: int, test: int, sample: int, positive_ratio: float = 0.5
         x, y = make_classification(n_samples, weights=[1 - positive_ratio, positive_ratio], random_state=42)
         x = pt.tensor(x, dtype=pt.float)
         y = pt.tensor(y[..., None], dtype=pt.float).squeeze()
-        
-        
+
     
     if dataset == 'credit':
         X, Y = load_credit_default_data()
