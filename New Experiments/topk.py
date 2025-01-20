@@ -30,7 +30,7 @@ current_file_name = os.path.splitext(current_file_name)[0]
 DIRECTORY = os.path.join(current_directory, f"{current_file_name}_output")
 
 # modified parameters for observations
-THRESHOLD = 0.5
+THRESHOLD = 0.7
 RECOURSENUM = 0.5
 COSTWEIGHT = 'uniform'
 DATASET = dataset
@@ -54,6 +54,8 @@ class Exp2(Helper):
 
         #randomly select from self.sample with size of train and label it with model
         self.train, isNewList = update_train_data(self.train, self.sample, self.model, 'mixed')
+        print(f"isNewList: {isNewList}")
+        print(f"isNewList.shape: {isNewList.shape}")
 
         # find training data with label 0 and select 1/2 of them
         data, labels = self.train.x, self.train.y
@@ -62,6 +64,8 @@ class Exp2(Helper):
         label_0_indices = label_0_indices[shuffled_indices]
         num_samples = math.floor(len(label_0_indices) * RECOURSENUM)
         selected_indices = label_0_indices[:num_samples]
+        print(f"selected_indice: {selected_indices}")
+        print(f"isNewList[selected_indices]: {isNewList[selected_indices]}")
 
         # perform recourse on the selected subset
         selected_subset = Dataset(data[selected_indices], labels[selected_indices].unsqueeze(1))

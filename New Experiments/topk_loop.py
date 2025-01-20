@@ -32,7 +32,7 @@ DIRECTORY = os.path.join(current_directory, f"{current_file_name}_output")
 # modified parameters for observations
 THRESHOLD_LIST = [0.5,0.7,0.9]
 RECOURSENUM_LIST = [0.2,0.5,0.7,0.9]
-COSTWEIGHT = 'log'
+COSTWEIGHT = 'uniform'
 DATASET = dataset
 
 try:

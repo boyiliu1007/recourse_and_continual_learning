@@ -77,6 +77,7 @@ def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.T
             avgNewRecourseCost = 0.0
             newCount = 0
             recourseCostList = []
+            print(f"isNew: {isNew}")
             for idx,t in enumerate(cost):
                 # if the idx matches isNew then count it as new recoursecost
                 # otherwise not
