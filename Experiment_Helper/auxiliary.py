@@ -79,32 +79,45 @@ def update_train_data(train, sample, model, type = 'all', expected_size = None):
     print(f"Number of 1s: {num_ones}")
 
 class FileSaver:
-    def __init__(self, fail_to_recourse, overall_acc_list, jsd_list, avgRecourseCost, avgNewRecourseCost, avgOriginalRecourseCost):
+    def __init__(self, fail_to_recourse, overall_acc_list, jsd_list, avgRecourseCost, avgNewRecourseCost, avgOriginalRecourseCost, t_rate_list, model_shift_list):
         self.failToRecourse = fail_to_recourse
         self.overall_acc_list = overall_acc_list
         self.jsd_list = jsd_list
         self.avgRecourseCost = avgRecourseCost
         self.avgNewRecourseCost = avgNewRecourseCost
         self.avgOriginalRecourseCost = avgOriginalRecourseCost
+        self.t_rate_list = t_rate_list
+        self.model_shift_list = model_shift_list
 
-    def save_to_csv(self, recourse_num, threshold, acceptance_rate, cost_weight, dataset, directory = ''):
-        current_time = datetime.datetime.now().strftime("%d-%H-%M")
+    def save_to_csv(self, recourse_num, threshold, acceptance_rate, cost_weight, dataset, current_time, directory = ''):
         filename = f"{recourse_num}_{threshold}_{acceptance_rate}_{cost_weight}_{dataset}_{current_time}.csv"
         if directory:
             directory = directory.rstrip('/') + '/'
             filename = directory + filename
 
+        print(len(self.failToRecourse))
+        print(len(self.overall_acc_list))
+        print(len(self.jsd_list))
+        print(len(self.avgRecourseCost))
+        print(len(self.avgNewRecourseCost))
+        print(len(self.avgOriginalRecourseCost))
+        print(len(self.t_rate_list))
+        print(len(self.model_shift_list))
+
         # since short term accuracy cannot calculate the first 2 element so insert two 0s here
         self.overall_acc_list.insert(0, 0)
         self.overall_acc_list.insert(0, 0)
-
+        self.overall_acc_list.insert(0, 0)
+        
         data = {
             'failToRecourse': self.failToRecourse,
             'acc': self.overall_acc_list,
             'jsd': self.jsd_list,
             'avgRecourseCost': self.avgRecourseCost,
             'avgNewRecourseCost': self.avgNewRecourseCost,
-            'avgOriginalRecourseCost': self.avgOriginalRecourseCost
+            'avgOriginalRecourseCost': self.avgOriginalRecourseCost,
+            't_rate': self.t_rate_list,
+            'model_shift': self.model_shift_list
         }
         df = pd.DataFrame(data)
         

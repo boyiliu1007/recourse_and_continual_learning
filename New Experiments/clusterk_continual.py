@@ -5,6 +5,7 @@ import numpy as np
 from IPython.display import display
 from scipy.stats import gaussian_kde
 import math
+import datetime
 
 import os
 import sys
@@ -32,7 +33,7 @@ except Exception as e:
     print(f"An error occurred: {e}")
 
 # modified parameters for observations
-THRESHOLD = 0.9
+THRESHOLD = 0.5
 RECOURSENUM = 0.5
 COSTWEIGHT = 'uniform'
 DATASET = dataset
@@ -47,6 +48,9 @@ class Exp3(Helper):
     def update(self, model: nn.Module, train: Dataset, sample: Dataset):
         print("round: ",self.round)
         self.round += 1
+
+        #save model parameters
+        self.model_params = deepcopy(self.model.state_dict())
 
         #randomly select from self.sample with size of train and label it with model
         self.train, isNewList = update_train_data(self.train, self.sample, self.model, 'mixed', self.train_size)
@@ -152,6 +156,24 @@ class Exp3(Helper):
 
         #jsd is calculated in helper.py already
 
+        #calculate t_rate
+        with pt.no_grad():
+            y_prob: pt.Tensor = self.model(test.x)
+        #calculate the ratio of 1s and 0s in the test data
+        num_ones = pt.where(y_prob > 0.5)[0].shape[0]
+        num_zeros = len(y_prob) - num_ones
+        t_rate = num_ones / num_zeros
+        self.t_rate_list.append(t_rate)
+        print("t_rate: ",t_rate)
+
+        #calculate model shift distance
+        last_model_params = self.model_params
+        current_model_params = self.model.state_dict()
+        shift_distance = pt.norm(
+            pt.cat([pt.flatten(last_model_params[key] - current_model_params[key])
+                for key in last_model_params.keys()]), p=2
+        )
+        self.model_shift_distance_list.append(shift_distance)
         #===========================================================================================
         
         self.train.x = self.train.x[keep_indices]             
@@ -163,13 +185,16 @@ class Exp3(Helper):
 exp3 = Exp3(si.model, pca, train, test, sample)
 exp3.si = si
 exp3.save_directory = DIRECTORY
+current_time = datetime.datetime.now().strftime("%d-%H-%M")
 ani1 = exp3.animate_all(100)
-ani1.save(os.path.join(DIRECTORY, "ex3.mp4"))
-exp3.overall_acc_list = exp3.overall_acc_list[2:]
+ani1.save(os.path.join(DIRECTORY, f"{RECOURSENUM}_{THRESHOLD}_{POSITIVE_RATIO}_{COSTWEIGHT}_{DATASET}_{current_time}.mp4"))
+exp3.overall_acc_list = exp3.overall_acc_list[3:]
 exp3.draw_avgRecourseCost()
 exp3.plot_jsd()
 exp3.draw_Fail_to_Recourse()
 exp3.plot_aac()
+exp3.plot_t_rate()
+exp3.plot_model_shift()
 
 # save to csv
 FileSaver(exp3.failToRecourse, 
@@ -177,5 +202,7 @@ FileSaver(exp3.failToRecourse,
           exp3.jsd_list, 
           exp3.avgRecourseCost_list, 
           exp3.avgNewRecourseCostList, 
-          exp3.avgOriginalRecourseCostList
-        ).save_to_csv(RECOURSENUM, THRESHOLD, POSITIVE_RATIO, COSTWEIGHT, DATASET, DIRECTORY)
+          exp3.avgOriginalRecourseCostList,
+          exp3.t_rate_list,
+          exp3.model_shift_distance_list
+        ).save_to_csv(RECOURSENUM, THRESHOLD, POSITIVE_RATIO, COSTWEIGHT, DATASET, current_time,DIRECTORY)
