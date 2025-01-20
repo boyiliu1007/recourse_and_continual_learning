@@ -106,6 +106,7 @@ def continual_training(si: SynapticIntelligence, dataset: Dataset, max_epochs: i
             optimizer.zero_grad()
             outputs = si.model(X_batch)
             outputs = outputs.squeeze()
+            
             if outputs.dim() != Y_batch.dim():
                 outputs = outputs.unsqueeze(-1)
             loss = criterion(outputs, Y_batch)

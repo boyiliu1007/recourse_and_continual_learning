@@ -157,6 +157,20 @@ def load_UCI_credit_default_data(n_samples,positive_ratio):
     
     return X, Y
 
+def load_housing_data():
+    df = pd.read_csv('Dataset/housing.csv')
+    df = df.dropna()
+    df = df.drop(['ocean_proximity'], axis = 1)
+    median_price = df['median_house_value'].median()
+
+    # convert target values to binary: 1 if above median, 0 otherwise
+    df['median_house_value'] = (df['median_house_value'] > median_price).astype(float)
+    X = df.drop('median_house_value', axis=1).values
+    Y = df['median_house_value'].values
+    print(X.shape)
+    print(Y.shape)
+    return X, Y
+
 def load_german_data():
     df = pd.read_csv('Dataset\german.csv')
     df = df.drop(['Status', 'History', 'Present residence', 'Age', 'Number people'], axis = 1)
@@ -185,7 +199,6 @@ def make_dataset(train: int, test: int, sample: int, positive_ratio: float = 0.5
         x, y = make_classification(n_samples, weights=[1 - positive_ratio, positive_ratio], random_state=42)
         x = pt.tensor(x, dtype=pt.float)
         y = pt.tensor(y[..., None], dtype=pt.float).squeeze()
-        
     
     if dataset == 'credit':
         X, Y = load_credit_default_data(n_samples,positive_ratio)
@@ -194,17 +207,40 @@ def make_dataset(train: int, test: int, sample: int, positive_ratio: float = 0.5
         y = pt.tensor(Y, dtype=pt.float).clone().detach()
     
     if dataset == 'UCIcredit':
-        X, Y = load_UCI_credit_default_data(n_samples,positive_ratio)
-        X, Y = X[:n_samples], Y[:n_samples]
-        x = pt.tensor(X, dtype=pt.float).clone().detach()
-        y = pt.tensor(Y, dtype=pt.float).clone().detach()
+        X, Y = load_UCI_credit_default_data()
+        X, Y = np.array(X), np.array(Y)
+        pos_indices = np.where(Y == 1)[0]
+        neg_indices = np.where(Y == 0)[0]
+        n_pos = int(n_samples * positive_ratio)
+        n_neg = n_samples - n_pos
+        selected_pos = np.random.choice(pos_indices, size=n_pos, replace=False)
+        selected_neg = np.random.choice(neg_indices, size=n_neg, replace=False)
+        selected_indices = np.concatenate([selected_pos, selected_neg])
+        np.random.shuffle(selected_indices)  # Shuffle to mix positives and negatives
+        X_selected = X[selected_indices]
+        Y_selected = Y[selected_indices]
+        x = pt.tensor(X_selected, dtype=pt.float).clone().detach()
+        y = pt.tensor(Y_selected, dtype=pt.float).clone().detach()
+
         
     if dataset == 'housing':
-        X, Y = load_housing_data(n_samples,positive_ratio)
-        X, Y = X[:n_samples], Y[:n_samples]
-        x = pt.tensor(X, dtype=pt.float).clone().detach()
-        y = pt.tensor(Y, dtype=pt.float).clone().detach()
-        
+        X, Y = load_housing_data()
+        X, Y = np.array(X), np.array(Y)
+        pos_indices = np.where(Y == 1)[0]
+        neg_indices = np.where(Y == 0)[0]
+        n_pos = int(n_samples * positive_ratio)
+        n_neg = n_samples - n_pos
+        selected_pos = np.random.choice(pos_indices, size=n_pos, replace=False)
+        selected_neg = np.random.choice(neg_indices, size=n_neg, replace=False)
+        selected_indices = np.concatenate([selected_pos, selected_neg])
+        np.random.shuffle(selected_indices)  # Shuffle to mix positives and negatives
+        X_selected = X[selected_indices]
+        Y_selected = Y[selected_indices]
+        x = pt.tensor(X_selected, dtype=pt.float).clone().detach()
+        y = pt.tensor(Y_selected, dtype=pt.float).clone().detach()
+        print(f"X_selected: {X_selected}")
+        print(f"Y_selected: {Y_selected}")
+
 
     if dataset == 'german':
         X, Y = load_german_data()

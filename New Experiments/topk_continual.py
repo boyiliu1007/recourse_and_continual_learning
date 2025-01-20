@@ -81,7 +81,6 @@ class Exp3(Helper):
         # update the labels of D using topk method
         with pt.no_grad():
           y_prob_all: pt.Tensor = self.model(self.train.x)
-        y_prob_all = y_prob_all
         sorted_indices = pt.argsort(y_prob_all[:, 0], dim=0, descending=True)
         cutoff_index = int(len(sorted_indices) * POSITIVE_RATIO)
         mask = pt.zeros_like(y_prob_all)
@@ -98,16 +97,14 @@ class Exp3(Helper):
         self.si.consolidate(3)
         #calculate metrics: ========================================================================
         #calculate short term accuracy
-        current_data = Dataset(train.x, train.y)
+        current_data = Dataset(self.train.x, self.train.y)
         self.historyTrainList.append(current_data)
-        self.overall_acc_list.append(self.calculate_AA(model, self.historyTrainList, 4))
+        self.overall_acc_list.append(self.calculate_AA(self.model, self.historyTrainList, 4))
         
 
         #calculate ftr
-        with pt.no_grad():
-            y_prob: pt.Tensor = self.model(train.x[selected_indices])
-        recourseFailCnt = len(y_prob[y_prob < 0.5])
-        recourseFailRate = recourseFailCnt / len(train.x[selected_indices])
+        recourseFailCnt = pt.where(self.train.y[selected_indices] == 0)[0].shape[0]
+        recourseFailRate = recourseFailCnt / len(self.train.y[selected_indices])
         self.failToRecourse.append(recourseFailRate)
 
         #jsd is calculated in helper.py already
