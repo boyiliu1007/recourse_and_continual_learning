@@ -1,28 +1,27 @@
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
 import pandas as pd
 
-class FileSaver:
-    def __init__(self, fail_to_recourse, overall_acc_list, jsd_list, avgRecourseCost, avgNewRecourseCost, avgOriginalRecourseCost):
-        self.failToRecourse = fail_to_recourse
-        self.overall_acc_list = overall_acc_list
-        self.jsd_list = jsd_list
-        self.avgRecourseCost = avgRecourseCost
-        self.avgNewRecourseCost = avgNewRecourseCost
-        self.avgOriginalRecourseCost = avgOriginalRecourseCost
+# Assuming the make_dataset function returns a train, test, sample, dataset object with x and y
+from Config.config import make_dataset
+train, test, sample, dataset = make_dataset(700, 500, 2500, 0.5, 'synthetic')
 
-    def save_to_csv(self, recourse_num, threshold, acceptance_rate, cost_weight, dataset):
-        filename = f"{recourse_num}_{threshold}_{acceptance_rate}_{cost_weight}_{dataset}.csv"
-        
-        data = {
-            'failToRecourse': self.failToRecourse,
-            'acc': self.overall_acc_list,
-            'jsd': self.jsd_list,
-            'avgRecourseCost': self.avgRecourseCost,
-            'avgNewRecourseCost': self.avgNewRecourseCost,
-            'avgOriginalRecourseCost': self.avgOriginalRecourseCost
-        }
-        df = pd.DataFrame(data)
-        
-        # Save the DataFrame to a CSV file
-        df.to_csv(filename, index=False)
-        print(f"File saved as: {filename}")
+# Apply PCA to reduce data to 2D
+pca = PCA(n_components=2)
+data_pca = pca.fit_transform(train.x)
 
+# Convert PCA result to a DataFrame for easier plotting
+pca_df = pd.DataFrame(data_pca, columns=['PC1', 'PC2'])
+
+# Add the labels from train.y to the DataFrame (assuming train.y contains the labels)
+pca_df['label'] = train.y
+
+# Plot the data with color coding based on the labels
+plt.figure(figsize=(8, 6))
+scatter = plt.scatter(pca_df['PC1'], pca_df['PC2'], c=pca_df['label'], cmap='viridis', alpha=0.7)
+plt.title('PCA of Dataset')
+plt.xlabel('Principal Component 1')
+plt.ylabel('Principal Component 2')
+plt.colorbar(scatter)  # Adds a color bar to the side to indicate label mapping
+plt.grid(True)
+plt.show()

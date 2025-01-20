@@ -25,7 +25,7 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from Config.config import test, train, sample
+from Config.continual_config import test, train, sample
 from Models.synapticIntelligence import SynapticIntelligence
 
 pca = PCA(2).fit(train.x)
@@ -93,6 +93,9 @@ class Helper:
         self.avgOriginalRecourseCostList = []
         self.historyTrainList = []
         self.train_size = 0
+        self.t_rate_list = []
+        self.model_params = None
+        self.model_shift_distance_list = []
 
     # def draw_proba_hist(self, ax: Axes | None = None, *, label: bool = False):
     def draw_proba_hist(self, ax: Axes = None, *, label: bool = False):
@@ -500,6 +503,22 @@ class Helper:
         plt.title('FtR during Rounds')
         plt.savefig(os.path.join(self.save_directory, 'Fail_to_Recourse.png'))
 
+    def plot_t_rate(self):
+        plt.figure()
+        plt.plot(self.t_rate_list)
+        plt.xlabel('Round')
+        plt.ylabel('t_rate')
+        plt.title('t_rate during Rounds')
+        plt.savefig(os.path.join(self.save_directory, 't_rate.png'))
+
+    def plot_model_shift(self):
+        plt.figure()
+        plt.plot(self.model_shift_distance_list)
+        plt.xlabel('Round')
+        plt.ylabel('model_shift_distance')
+        plt.title('model_shift_distance during Rounds')
+        plt.savefig(os.path.join(self.save_directory, 'model_shift_distance.png'))
+
     def draw_Fail_to_Recourse_on_Model(self):
         plt.figure()
         plt.plot(self.failToRecourseOnModel)
@@ -640,11 +659,11 @@ class Helper:
             sum = 0
             weights = self._get_weight(rangenum)
         
-            if(len(jth_data_after_recourse) < rangenum):
+            if(len(jth_data_after_recourse) <= rangenum):
                 return 0
             
             # do each historical task
-            for j in range(-2, -rangenum - 1, -1):
+            for j in range(-2, -rangenum - 2, -1):
                 pred = kth_model(jth_data_after_recourse[j].x)
                 acc = self.calculate_accuracy(pred, jth_data_after_recourse[j].y) * weights[j+1]
                 self.testacc.append(acc)
