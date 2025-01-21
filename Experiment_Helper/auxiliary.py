@@ -105,9 +105,7 @@ class FileSaver:
         print(len(self.model_shift_list))
 
         # since short term accuracy cannot calculate the first 2 element so insert two 0s here
-        self.overall_acc_list.insert(0, 0)
-        self.overall_acc_list.insert(0, 0)
-        self.overall_acc_list.insert(0, 0)
+        
         
         data = {
             'failToRecourse': self.failToRecourse,

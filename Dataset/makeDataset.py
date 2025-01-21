@@ -91,7 +91,7 @@ def load_credit_default_data(n_samples,positive_ratio):
     df = df.sample(frac=1).reset_index(drop=True)
 
     df = df.drop(['Married', 'Single', 'Age_lt_25', 'Age_in_25_to_40', 'Age_in_40_to_59', 'Age_geq_60'], axis = 1)
-
+    
     scaler = StandardScaler()
     df.loc[:, df.columns != "NoDefaultNextMonth"] = scaler.fit_transform(df.drop("NoDefaultNextMonth", axis=1))
 

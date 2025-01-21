@@ -33,7 +33,7 @@ except Exception as e:
     print(f"An error occurred: {e}")
 
 # modified parameters for observations
-THRESHOLD = 0.6            #0.5 0.7 0.9
+THRESHOLD = 0.7            #0.5 0.7 0.9
 RECOURSENUM = 0.5          #0.2 0.5 0.7
 COSTWEIGHT = 'uniform'     #uniform log
 DATASET = dataset
@@ -95,7 +95,7 @@ class Exp3(Helper):
         kde_scores = kde(positive_data.cpu().numpy().T)    # Compute density
         weights = 1 / kde_scores  # Transform each weight
         weights = weights / np.sum(weights)
-        weights = weights + y_prob_all[positive_indices].cpu().numpy().flatten() * 0.01
+        weights = weights + y_prob_all[positive_indices].cpu().numpy().flatten() * 0.0001
         weights = weights / np.sum(weights)  # Renormalize weights to ensure they sum to 1
         if positive_indices.shape[0] < math.floor(self.train.x.shape[0] * POSITIVE_RATIO):
             sample_size = positive_indices.shape[0]
@@ -141,7 +141,7 @@ class Exp3(Helper):
         #calculate short term accuracy
         current_data = Dataset(self.train.x, self.train.y)
         self.historyTrainList.append(current_data)
-        self.overall_acc_list.append(self.calculate_AA(self.model, self.historyTrainList, 4))
+        self.overall_acc_list.append(self.calculate_AA(self.model, self.historyTrainList, 7))
         
         #add back the unselected positive data in original order
         # Create a new tensor with the correct shape
@@ -194,7 +194,7 @@ exp3.save_directory = DIRECTORY
 current_time = datetime.datetime.now().strftime("%d-%H-%M")
 ani1 = exp3.animate_all(100)
 ani1.save(os.path.join(DIRECTORY, f"{RECOURSENUM}_{THRESHOLD}_{POSITIVE_RATIO}_{COSTWEIGHT}_{DATASET}_{current_time}.mp4"))
-exp3.overall_acc_list = exp3.overall_acc_list[3:]
+exp3.overall_acc_list = exp3.overall_acc_list
 exp3.draw_avgRecourseCost()
 exp3.plot_jsd()
 exp3.draw_Fail_to_Recourse()
