@@ -640,7 +640,7 @@ class Helper:
       return accuracy
     
     def _weight_func(self, x):
-        return x*x*x
+        return 1
     
     def _get_weight(self, observe_range):
         weights = []
@@ -653,14 +653,13 @@ class Helper:
         return [w / sum for w in weights]
 
     def calculate_AA(self, kth_model: nn.Module, jth_data_after_recourse: list, rangenum):
+        rangenum = min(rangenum, len(jth_data_after_recourse))
         rangenum -= 1
         if jth_data_after_recourse:
             kth_model.eval()
             sum = 0
             weights = self._get_weight(rangenum)
-        
-            if(len(jth_data_after_recourse) <= rangenum):
-                return 0
+
             
             # do each historical task
             for j in range(-2, -rangenum - 2, -1):
