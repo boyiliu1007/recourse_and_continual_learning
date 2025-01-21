@@ -29,8 +29,61 @@ class Dataset(data.Dataset):
 
     def __repr__(self):
         return f'{type(self)}({self.x.shape})'
+    
+def load_housing_data(n_samples,positive_ratio):
+    pt.manual_seed(0)
+    np.random.seed(0)
+    df = pd.read_csv('Dataset/housing.csv')
+    df = df.sample(frac=1).reset_index(drop=True)
 
-def load_credit_default_data():
+    # df = df.drop(['ID', 'SEX', 'EDUCATION', 'MARRIAGE', 'AGE', 'PAY_0', 'PAY_2', 'PAY_3', 'PAY_4', 'PAY_5', 'PAY_6'], axis = 1)
+    df = df.drop(['ocean_proximity'], axis = 1)
+    # remove data that has NaN
+    df = df.dropna()
+
+    # print(f"DF: {df}")
+    #20637 nan
+    
+    # 計算 median_house_value 的中位數
+    median_value = df['median_house_value'].median()
+    print(f"median: {median_value}")
+
+    # 將 median_house_value 的值改為二元分類
+    df['median_house_value'] = (df['median_house_value'] > median_value).astype(int)
+    print(f"DF: {df}")
+    
+    scaler = StandardScaler()
+    df.loc[:, df.columns != "median_house_value"] = scaler.fit_transform(df.drop("median_house_value", axis=1))
+    # print(df)
+
+    median_df = df.loc[df["median_house_value"] == 1][:5000]
+    non_median_df = df.loc[df["median_house_value"] == 0][:5000]
+    print(f"default_df.shape: {median_df.shape}")
+    print(f"non_default_df.shape: {non_median_df.shape}")
+    print(f"fraud_df{median_df}")
+    print(f"non_fraud_df{non_median_df}")
+
+    normal_distributed_df = pd.concat([median_df, non_median_df])
+    
+    n_positive = int(n_samples * positive_ratio)
+    n_negative = n_samples - n_positive
+    
+    positive_data = normal_distributed_df[normal_distributed_df["median_house_value"] == 1].sample(n = n_positive,random_state=42)
+    negative_data = normal_distributed_df[normal_distributed_df["median_house_value"] == 0].sample(n = n_negative,random_state=42)
+
+    # Shuffle dataframe rows
+    # df = normal_distributed_df.sample(frac=1).reset_index(drop=True)
+    df = pd.concat([positive_data, negative_data]).sample(frac=1, random_state=42).reset_index(drop=True)
+    
+    # print("Sampled data distribution:")
+    # print(df['NoDefaultNextMonth'].value_counts(normalize=True))  # 檢查正負樣本比例
+    # print(f"Total samples: {len(df)}")
+
+    Y, X = df.iloc[:, 8].values, df.iloc[:, :8].values
+    
+    return X, Y
+
+def load_credit_default_data(n_samples,positive_ratio):
     pt.manual_seed(0)
     np.random.seed(0)
     url = 'https://raw.githubusercontent.com/ustunb/actionable-recourse/master/examples/paper/data/credit_processed.csv'
@@ -43,18 +96,29 @@ def load_credit_default_data():
     df.loc[:, df.columns != "NoDefaultNextMonth"] = scaler.fit_transform(df.drop("NoDefaultNextMonth", axis=1))
 
     fraud_df = df.loc[df["NoDefaultNextMonth"] == 0]
-    non_fraud_df = df.loc[df["NoDefaultNextMonth"] == 1][:6636]
+    non_fraud_df = df.loc[df["NoDefaultNextMonth"] == 1]
 
     normal_distributed_df = pd.concat([fraud_df, non_fraud_df])
+    
+    n_positive = int(n_samples * positive_ratio)
+    n_negative = n_samples - n_positive
+    
+    positive_data = normal_distributed_df[normal_distributed_df["NoDefaultNextMonth"] == 1].sample(n = n_positive,random_state=42)
+    negative_data = normal_distributed_df[normal_distributed_df["NoDefaultNextMonth"] == 0].sample(n = n_negative,random_state=42)
 
     # Shuffle dataframe rows
-    df = normal_distributed_df.sample(frac=1).reset_index(drop=True)
+    # df = normal_distributed_df.sample(frac=1).reset_index(drop=True)
+    df = pd.concat([positive_data, negative_data]).sample(frac=1, random_state=42).reset_index(drop=True)
+    
+    # print("Sampled data distribution:")
+    # print(df['NoDefaultNextMonth'].value_counts(normalize=True))  # 檢查正負樣本比例
+    # print(f"Total samples: {len(df)}")
 
     Y, X = df.iloc[:, 0].values, df.iloc[:, 1:].values
     
     return X, Y
 
-def load_UCI_credit_default_data():
+def load_UCI_credit_default_data(n_samples,positive_ratio):
     pt.manual_seed(0)
     np.random.seed(0)
     df = pd.read_csv('Dataset/UCI_Credit_Card.csv')
@@ -66,7 +130,7 @@ def load_UCI_credit_default_data():
     a = df.loc[df["default.payment.next.month"] == 0]
     scaler = StandardScaler()
     df.loc[:, df.columns != "default.payment.next.month"] = scaler.fit_transform(df.drop("default.payment.next.month", axis=1))
-    print(df)
+    # print(df)
 
     default_df = df.loc[df["default.payment.next.month"] == 1]
     non_default_df = df.loc[df["default.payment.next.month"] == 0][:6636]
@@ -76,13 +140,20 @@ def load_UCI_credit_default_data():
     # print(f"non_fraud_df{non_fraud_df}")
 
     normal_distributed_df = pd.concat([default_df, non_default_df])
+    
+    n_positive = int(n_samples * positive_ratio)
+    n_negative = n_samples - n_positive
+    
+    positive_data = normal_distributed_df[normal_distributed_df["default.payment.next.month"] == 1].sample(n = n_positive,random_state=42)
+    negative_data = normal_distributed_df[normal_distributed_df["default.payment.next.month"] == 0].sample(n = n_negative,random_state=42)
 
     # Shuffle dataframe rows
-    df = normal_distributed_df.sample(frac=1).reset_index(drop=True)
+    # df = normal_distributed_df.sample(frac=1).reset_index(drop=True)
+    df = pd.concat([positive_data, negative_data]).sample(frac=1, random_state=42).reset_index(drop=True)
 
     Y, X = df.iloc[:, 19].values, df.iloc[:, :19].values
-    print(f"X: {X}")
-    print(f"Y: {Y}")
+    # print(f"X: {X}")
+    # print(f"Y: {Y}")
     
     return X, Y
 
@@ -119,8 +190,8 @@ def load_sba_data():
     print(Y.shape)
     return X, Y
 
-DATASETS = ['synthetic', 'credit', 'german', 'sba','UCIcredit', 'housing']
-def make_dataset(train: int, test: int, sample: int, positive_ratio: float = 0.5, dataset: str = 'housing'):
+DATASETS = ['synthetic', 'credit', 'german', 'sba','UCIcredit','housing']
+def make_dataset(train: int, test: int, sample: int, positive_ratio: float = 0.5, dataset: str = 'synthetic'):
     n_samples = train + test + sample
 
     if dataset == 'synthetic':
@@ -128,10 +199,9 @@ def make_dataset(train: int, test: int, sample: int, positive_ratio: float = 0.5
         x, y = make_classification(n_samples, weights=[1 - positive_ratio, positive_ratio], random_state=42)
         x = pt.tensor(x, dtype=pt.float)
         y = pt.tensor(y[..., None], dtype=pt.float).squeeze()
-
     
     if dataset == 'credit':
-        X, Y = load_credit_default_data()
+        X, Y = load_credit_default_data(n_samples,positive_ratio)
         X, Y = X[:n_samples], Y[:n_samples]
         x = pt.tensor(X, dtype=pt.float).clone().detach()
         y = pt.tensor(Y, dtype=pt.float).clone().detach()
