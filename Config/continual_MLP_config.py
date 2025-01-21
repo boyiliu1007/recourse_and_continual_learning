@@ -8,8 +8,8 @@ from Dataset.makeDataset import make_dataset
 from Models.MLP import MLP
 from Models.synapticIntelligence import SynapticIntelligence, continual_training
 
-POSITIVE_RATIO = 0.25
-train, test, sample = make_dataset(100, 100, 2000, POSITIVE_RATIO)
+POSITIVE_RATIO = 0.5
+train, test, sample, dataset = make_dataset(700, 500, 2500, POSITIVE_RATIO, 'UCIcredit')
 model = MLP(train.x.shape[1], 1)
 loss_list = []
 criterion = nn.BCELoss()
@@ -17,8 +17,7 @@ optimizer = optim.Adam(model.parameters(), lr = 0.001)
 si = SynapticIntelligence(model)
 
 continual_training(si, train, 100, loss_list, lambda_=0)
-si.update_omega(train, criterion)
-si.consolidate()
+
 
 plt.figure()
 plt.plot(loss_list)

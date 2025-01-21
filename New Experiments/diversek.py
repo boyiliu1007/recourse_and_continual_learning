@@ -14,9 +14,8 @@ from Experiment_Helper.helper import Helper, pca
 from Experiment_Helper.auxiliary import getWeights, update_train_data, FileSaver
 
 from Models.logisticRegression import LogisticRegression, training
-from Models.synapticIntelligence import continual_training
 from Models.recourseGradient import recourse
-from Config.continual_config import train, test, sample, si, dataset, POSITIVE_RATIO # modified parameters for observations
+from Config.config import train, model, test, sample, dataset, POSITIVE_RATIO # modified parameters for observations
 from Dataset.makeDataset import Dataset
 
 current_file_path = __file__
@@ -130,13 +129,7 @@ class Exp3(Helper):
         self.train.y = self.train.y[keep_indices]             
 
         # train the model with the updated dataset
-        if(self.jsd_list == []):
-            continual_training(self.si, self.train, 50, lambda_ = 0)
-        else:
-            continual_training(self.si, self.train, 50, lambda_ = 0.0000001/(self.jsd_list[-1]))
-
-        self.si.update_omega(self.train, nn.BCELoss())
-        self.si.consolidate(3)
+        training(self.model, self.train, 50, self.test,loss_list=self.RegreesionModelLossList,val_loss_list=self.RegreesionModel_valLossList,printLoss=True)
 
         #calculate metrics: ========================================================================
         #calculate short term accuracy
@@ -189,8 +182,7 @@ class Exp3(Helper):
 
 
 
-exp3 = Exp3(si.model, pca, train, test, sample)
-exp3.si = si
+exp3 = Exp3(model, pca, train, test, sample)
 exp3.save_directory = DIRECTORY
 current_time = datetime.datetime.now().strftime("%d-%H-%M")
 ani1 = exp3.animate_all(100)
@@ -212,4 +204,4 @@ FileSaver(exp3.failToRecourse,
           exp3.avgOriginalRecourseCostList,
           exp3.t_rate_list,
           exp3.model_shift_distance_list
-        ).save_to_csv(RECOURSENUM, THRESHOLD, POSITIVE_RATIO, COSTWEIGHT, DATASET, current_time,DIRECTORY)
+        ).save_to_csv(RECOURSENUM, THRESHOLD, POSITIVE_RATIO, COSTWEIGHT, DATASET, current_time, DIRECTORY)

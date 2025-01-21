@@ -11,7 +11,7 @@ from Models.synapticIntelligence import SynapticIntelligence, continual_training
 
 POSITIVE_RATIO = 0.5
 #200 250 5000
-train, test, sample, dataset = make_dataset(700, 500, 2500, POSITIVE_RATIO, 'UCIcredit')
+train, test, sample, dataset = make_dataset(700, 500, 2500, POSITIVE_RATIO, 'synthetic')
 
 model = LogisticRegression(train.x.shape[1], 1)
 loss_list = []

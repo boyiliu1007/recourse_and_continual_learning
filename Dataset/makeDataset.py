@@ -207,7 +207,7 @@ def make_dataset(train: int, test: int, sample: int, positive_ratio: float = 0.5
         y = pt.tensor(Y, dtype=pt.float).clone().detach()
     
     if dataset == 'UCIcredit':
-        X, Y = load_UCI_credit_default_data()
+        X, Y = load_UCI_credit_default_data(n_samples,positive_ratio)
         X, Y = np.array(X), np.array(Y)
         pos_indices = np.where(Y == 1)[0]
         neg_indices = np.where(Y == 0)[0]

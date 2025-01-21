@@ -16,7 +16,7 @@ from Experiment_Helper.auxiliary import getWeights, update_train_data, FileSaver
 from Models.logisticRegression import LogisticRegression, training
 from Models.synapticIntelligence import continual_training
 from Models.recourseGradient import recourse
-from Config.continual_config import train, test, sample, si, dataset, POSITIVE_RATIO # modified parameters for observations
+from Config.continual_MLP_config import train, test, sample, si, dataset, POSITIVE_RATIO # modified parameters for observations
 from Dataset.makeDataset import Dataset
 
 current_file_path = __file__
@@ -101,10 +101,9 @@ class Exp3(Helper):
             sample_size = positive_indices.shape[0]
         else:
             sample_size = math.floor(self.train.x.shape[0] * POSITIVE_RATIO)
-        
         sampled_indices = np.random.choice(
             positive_indices.cpu().numpy(),  # Indices to sample from
-            size=sample_size,                # Number of samples
+            size=sample_size,                         # Number of samples
             replace=False,                   # No replacement
             p=weights                        # Probability weights
         )

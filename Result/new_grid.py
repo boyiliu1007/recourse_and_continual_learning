@@ -9,8 +9,8 @@ metrics_list = ["t_rate", "model_shift", "acc"]
 
 # Folder paths
 folder_paths = {
-    "Folder1": "New Experiments/topk_MLP_output",
-    "Folder2": "New Experiments/topk_output"
+    "Folder1": "New Experiments/diversek_continual_MLP_output",
+    "Folder2": "New Experiments/diversek_continual_output"
 }
 
 # Dictionary to store extracted data
@@ -84,9 +84,9 @@ if ncols == 1:
 handles = []
 legend_labels = []
 y_limits = {
-    "t_rate": (0, 0.6),         # Adjust based on expected range
-    "model_shift": (0, 2.5),  # Example range, adjust as needed
-    "acc": (0.7, 1)
+    "t_rate": (0, 6),         # Adjust based on expected range
+    "model_shift": (0, 6),  # Example range, adjust as needed
+    "acc": (0.8, 1)
 }
 
 # Iterate through datasets and metrics
