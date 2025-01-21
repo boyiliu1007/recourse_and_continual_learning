@@ -32,7 +32,7 @@ current_file_name = os.path.splitext(current_file_name)[0]
 DIRECTORY = os.path.join(current_directory, f"{current_file_name}_output")
 
 # modified parameters for observations
-THRESHOLD = 0.5            #0.5 0.7 0.9
+THRESHOLD = 0.7            #0.5 0.7 0.9
 RECOURSENUM = 0.5          #0.2 0.5 0.7
 COSTWEIGHT = 'uniform'     #uniform log
 DATASET = dataset
@@ -110,7 +110,7 @@ class Exp2(Helper):
         #calculate short term accuracy
         current_data = Dataset(self.train.x, self.train.y)
         self.historyTrainList.append(current_data)
-        self.overall_acc_list.append(self.calculate_AA(self.model, self.historyTrainList, 4))
+        self.overall_acc_list.append(self.calculate_AA(self.model, self.historyTrainList, 7))
 
         #calculate ftr
         recourseFailCnt = pt.where(self.train.y[selected_indices] == 0)[0].shape[0]
@@ -133,10 +133,10 @@ class Exp2(Helper):
         #calculate model shift distance
         last_model_params = self.model_params
         current_model_params = self.model.state_dict()
-        shift_distance = pt.norm(
-            pt.cat([pt.flatten(last_model_params[key] - current_model_params[key])
-                for key in last_model_params.keys()]), p=2
-        )
+        shift_distance = sum(
+            pt.norm(last_model_params[key] - current_model_params[key], p=2) ** 2
+            for key in last_model_params.keys()
+        ).sqrt()
         self.model_shift_distance_list.append(shift_distance)
 
 
@@ -146,7 +146,7 @@ exp2.save_directory = DIRECTORY
 ani1 = exp2.animate_all(100)
 current_time = datetime.datetime.now().strftime("%d-%H-%M")
 ani1.save(os.path.join(DIRECTORY, f"{RECOURSENUM}_{THRESHOLD}_{POSITIVE_RATIO}_{COSTWEIGHT}_{DATASET}_{current_time}.mp4"))
-exp2.overall_acc_list = exp2.overall_acc_list[3:]
+exp2.overall_acc_list = exp2.overall_acc_list
 exp2.draw_avgRecourseCost()
 exp2.plot_jsd()
 exp2.draw_Fail_to_Recourse()
