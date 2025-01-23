@@ -94,7 +94,7 @@ class Exp3(Helper):
         kde_scores = kde(positive_data.cpu().numpy().T)    # Compute density
         weights = 1 / kde_scores  # Transform each weight
         weights = weights / np.sum(weights)
-        weights = weights + y_prob_all[positive_indices].cpu().numpy().flatten() * 0.0001
+        weights = weights + y_prob_all[positive_indices].cpu().numpy().flatten() * 0.00001
         weights = weights / np.sum(weights)  # Renormalize weights to ensure they sum to 1
         if positive_indices.shape[0] < math.floor(self.train.x.shape[0] * POSITIVE_RATIO):
             sample_size = positive_indices.shape[0]
@@ -130,6 +130,7 @@ class Exp3(Helper):
 
         # train the model with the updated dataset
         training(self.model, self.train, 50, self.test,loss_list=self.RegreesionModelLossList,val_loss_list=self.RegreesionModel_valLossList,printLoss=True)
+
 
         #calculate metrics: ========================================================================
         #calculate short term accuracy
@@ -176,7 +177,7 @@ class Exp3(Helper):
         self.model_shift_distance_list.append(shift_distance)
         #===========================================================================================
         
-        self.train.x = self.train.x[keep_indices]             
+        self.train.x = self.train.x[keep_indices]
         self.train.y = self.train.y[keep_indices]
 
 

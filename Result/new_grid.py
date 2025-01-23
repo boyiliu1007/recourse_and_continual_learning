@@ -9,8 +9,11 @@ metrics_list = ["t_rate", "model_shift", "acc"]
 
 # Folder paths
 folder_paths = {
-    "Folder1": "New Experiments/diversek_continual_MLP_output",
-    "Folder2": "New Experiments/diversek_continual_output"
+    "Folder2": "New Experiments/diversek_output/five",
+    "Folder3": "New Experiments/topk_continual_static_output/five",
+    "Folder4": "New Experiments/topk_output/five",
+    "Folder5": "New Experiments/diversek_continual_output/five",
+    "Folder6": "New Experiments/topk_continual_output",
 }
 
 # Dictionary to store extracted data
@@ -54,7 +57,6 @@ for folder_name, folder_path in folder_paths.items():
                                 cleaned_values.append(num)
                             except ValueError:
                                 print(f"Skipping invalid tensor value: {val}")  # Debugging
-
                         else:
                             try:
                                 cleaned_values.append(float(val))  # Convert normal numbers
@@ -62,47 +64,73 @@ for folder_name, folder_path in folder_paths.items():
                                 print(f"Skipping invalid value: {val}")
 
                     data_dict[folder_name][dataset_name][metric].extend(cleaned_values)
+
 # Ensure data is loaded correctly
 print("Data dictionary preview:", data_dict)
 
-# Grid plot configuration
-nrows, ncols = len(datasets), len(metrics_list)
-fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(12, 10), constrained_layout=True)
-
 # Colors and labels
-colors = {"Folder1": "#1f77b4", "Folder2": "#ff7f0e"}  # Blue & Orange
-linestyles = {"Folder1": "-", "Folder2": "-"}
-labels = {"Folder1": "MLP", "Folder2": "vanilla"}
-
-# Ensure axes is iterable when nrows or ncols = 1
-if nrows == 1:
-    axes = np.expand_dims(axes, axis=0)
-if ncols == 1:
-    axes = np.expand_dims(axes, axis=1)
-
-# Store handles & labels for a single legend
-handles = []
-legend_labels = []
-y_limits = {
-    "t_rate": (0, 6),         # Adjust based on expected range
-    "model_shift": (0, 6),  # Example range, adjust as needed
-    "acc": (0.8, 1)
+colors = {
+    "Folder2": "#ff7f0e",
+    "Folder3": "#2ca02c",
+    "Folder4": "#d62728",
+    "Folder5": "#9467bd",
+    "Folder6": "#8c564b"
+}
+linestyles = {
+    "Folder2": "-",
+    "Folder3": "-",
+    "Folder4": "-",
+    "Folder5": "-",
+    "Folder6": "-"
+}
+labels = {
+    "Folder2": "fair-topk",
+    "Folder3": "topk-continual-static-lambda",
+    "Folder4": "topk",
+    "Folder5": "fair-topk-continual-lambda",
+    "Folder6": "topk-continual"
 }
 
-# Iterate through datasets and metrics
-for i, dataset in enumerate(datasets):
-    for j, metric in enumerate(metrics_list):
-        ax = axes[i, j]
+# Y-axis limits for each metric
+y_limits = {
+    "t_rate": (0, 1.6),
+    "model_shift": (0, 10),
+    "acc": (0.6, 1)
+}
+# Compute adaptive y-limits for "model_shift"
+all_model_shift_values = []
+for folder_name in folder_paths.keys():
+    for dataset in datasets:
+        all_model_shift_values.extend(data_dict[folder_name][dataset]["model_shift"])
+
+# Set adaptive limits
+if all_model_shift_values:
+    min_shift, max_shift = min(all_model_shift_values), max(all_model_shift_values)
+    margin = (max_shift - min_shift) * 0.1  # 10% margin
+    y_limits["model_shift"] = (max(0, min_shift - margin), max_shift + margin)
+else:
+    y_limits["model_shift"] = (0, 10)  # Default fallback in case no data exists
+
+# Store legend handles for separate legend plot
+legend_handles = []
+legend_labels = []
+
+# Generate separate figures for each metric
+for metric in metrics_list:
+    fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(8, 12), constrained_layout=True)
+
+    for i, dataset in enumerate(datasets):
+        ax = axes[i]
 
         for folder_name in folder_paths.keys():
             values = data_dict[folder_name][dataset][metric]
             if values:
-                line, = ax.plot(values, linestyle=linestyles[folder_name], alpha=0.8, 
+                line, = ax.plot(values, linestyle=linestyles[folder_name], alpha=0.8,
                                 color=colors[folder_name], linewidth=2, label=labels[folder_name])
 
-                # Collect legend handles & labels only once
+                # Collect legend handles only once
                 if labels[folder_name] not in legend_labels:
-                    handles.append(line)
+                    legend_handles.append(line)
                     legend_labels.append(labels[folder_name])
 
         # Set y-axis limit dynamically based on the metric
@@ -110,21 +138,29 @@ for i, dataset in enumerate(datasets):
             ax.set_ylim(y_limits[metric])
 
         ax.grid(True, linestyle=":", alpha=0.5)
+        if metric == "t_rate":
+            ax.set_ylabel(f"Dataset: {dataset}", fontsize=16, fontweight="normal")
 
-# Add row titles (datasets)
-for i, dataset in enumerate(datasets):
-    axes[i, 0].set_ylabel(f"Dataset: {dataset}", fontsize=15, fontweight="normal")
+    # Add title
+    if metric == "t_rate":
+        fig.suptitle("Test Acceptance Rate", fontsize=16, fontweight="normal")
+    elif metric == "model_shift":
+        fig.suptitle("Model Shift", fontsize=16, fontweight="normal")
+    elif metric == "acc":
+        fig.suptitle("Short-Term Accuracy", fontsize=16, fontweight="normal")
+    
 
-# Add column titles (metrics)
-for j, metric in enumerate(metrics_list):
-    axes[0, j].set_title(f"Metric: {metric}", fontsize=15, fontweight="normal")
+    # Save the individual metric plot
+    plt.savefig(f"Result/{metric}_comparison.png")
+    plt.show()
 
-# Create a single legend below all subplots
-fig.legend(handles, legend_labels, loc="lower center", ncol=2, fontsize=12, frameon=True)
+# Create a separate legend plot
+fig_legend, ax_legend = plt.subplots(figsize=(8, 2))
+ax_legend.axis("off")  # Hide axes
 
-# Adjust layout to fit legend
-fig.subplots_adjust(bottom=0.15)
+# Create a legend
+ax_legend.legend(legend_handles, legend_labels, loc="center", fontsize=12, frameon=True, ncol=2)
 
-# Save the plot
-plt.savefig(f"Result/grid_comparison.png")
+# Save the legend as a separate plot
+plt.savefig("Result/legend_plot.png")
 plt.show()

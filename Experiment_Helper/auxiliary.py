@@ -95,6 +95,10 @@ class FileSaver:
             directory = directory.rstrip('/') + '/'
             filename = directory + filename
 
+        self.avgRecourseCost.insert(0, 0)
+        self.avgNewRecourseCost.insert(0, 0)
+        self.avgOriginalRecourseCost.insert(0, 0)
+
         print(len(self.failToRecourse))
         print(len(self.overall_acc_list))
         print(len(self.jsd_list))

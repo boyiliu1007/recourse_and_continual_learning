@@ -7,6 +7,7 @@ import math
 
 import os
 import sys
+import datetime
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from Experiment_Helper.helper import Helper, pca
 from Experiment_Helper.auxiliary import getWeights, update_train_data, FileSaver
@@ -46,6 +47,9 @@ class Exp3(Helper):
     def update(self, model: nn.Module, train: Dataset, sample: Dataset):
         print("round: ",self.round)
         self.round += 1
+
+        #save model parameters
+        self.model_params = deepcopy(self.model.state_dict())
 
         #randomly select from self.sample with size of train and label it with model
         self.train, isNewList = update_train_data(self.train, self.sample, self.model, 'mixed')
@@ -99,7 +103,7 @@ class Exp3(Helper):
         #calculate short term accuracy
         current_data = Dataset(self.train.x, self.train.y)
         self.historyTrainList.append(current_data)
-        self.overall_acc_list.append(self.calculate_AA(self.model, self.historyTrainList, 4))
+        self.overall_acc_list.append(self.calculate_AA(self.model, self.historyTrainList, 7))
         
 
         #calculate ftr
@@ -108,18 +112,38 @@ class Exp3(Helper):
         self.failToRecourse.append(recourseFailRate)
 
         #jsd is calculated in helper.py already
+        #calculate t_rate
+        with pt.no_grad():
+            y_prob: pt.Tensor = self.model(test.x)
+        #calculate the ratio of 1s and 0s in the test data
+        num_ones = pt.where(y_prob > 0.5)[0].shape[0]
+        num_zeros = len(y_prob) - num_ones
+        t_rate = num_ones / num_zeros
+        self.t_rate_list.append(t_rate)
+        print("t_rate: ",t_rate)
+
+        #calculate model shift distance
+        last_model_params = self.model_params
+        current_model_params = self.model.state_dict()
+        shift_distance = sum(
+            pt.norm(last_model_params[key] - current_model_params[key], p=2) ** 2
+            for key in last_model_params.keys()
+        ).sqrt()
+        self.model_shift_distance_list.append(shift_distance)
 
 
 exp3 = Exp3(si.model, pca, train, test, sample)
 exp3.si = si
 exp3.save_directory = DIRECTORY
+current_time = datetime.datetime.now().strftime("%d-%H-%M")
 ani1 = exp3.animate_all(100)
-ani1.save(os.path.join(DIRECTORY, "ex3.gif"))
-exp3.overall_acc_list = exp3.overall_acc_list[2:]
+ani1.save(os.path.join(DIRECTORY, f"{RECOURSENUM}_{THRESHOLD}_{POSITIVE_RATIO}_{COSTWEIGHT}_{DATASET}_{current_time}.mp4"))
 exp3.draw_avgRecourseCost()
 exp3.plot_jsd()
 exp3.draw_Fail_to_Recourse()
 exp3.plot_aac()
+exp3.plot_t_rate()
+exp3.plot_model_shift()
 
 # save to csv
 FileSaver(exp3.failToRecourse, 
@@ -127,5 +151,7 @@ FileSaver(exp3.failToRecourse,
           exp3.jsd_list, 
           exp3.avgRecourseCost_list, 
           exp3.avgNewRecourseCostList, 
-          exp3.avgOriginalRecourseCostList
-        ).save_to_csv(RECOURSENUM, THRESHOLD, POSITIVE_RATIO, COSTWEIGHT, DATASET, DIRECTORY)
+          exp3.avgOriginalRecourseCostList,
+          exp3.t_rate_list,
+          exp3.model_shift_distance_list
+        ).save_to_csv(RECOURSENUM, THRESHOLD, POSITIVE_RATIO, COSTWEIGHT, DATASET, current_time, DIRECTORY)

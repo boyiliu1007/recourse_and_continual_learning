@@ -58,49 +58,49 @@ class Exp2(Helper):
         #save model parameters
         self.model_params = deepcopy(self.model.state_dict())
 
-        #randomly select from self.sample with size of train and label it with model
-        self.train, isNewList = update_train_data(self.train, self.sample, self.model, 'mixed')
+        if self.round != 1:
+            #randomly select from self.sample with size of train and label it with model
+            self.train, isNewList = update_train_data(self.train, self.sample, self.model, 'mixed')
 
-        # find training data with label 0 and select 1/2 of them
-        data, labels = self.train.x, self.train.y
-        label_0_indices = pt.where(labels == 0)[0]
-        shuffled_indices = pt.randperm(len(label_0_indices))
-        label_0_indices = label_0_indices[shuffled_indices]
-        num_samples = math.floor(len(label_0_indices) * RECOURSENUM)
-        selected_indices = label_0_indices[:num_samples]
+            # find training data with label 0 and select 1/2 of them
+            data, labels = self.train.x, self.train.y
+            label_0_indices = pt.where(labels == 0)[0]
+            shuffled_indices = pt.randperm(len(label_0_indices))
+            label_0_indices = label_0_indices[shuffled_indices]
+            num_samples = math.floor(len(label_0_indices) * RECOURSENUM)
+            selected_indices = label_0_indices[:num_samples]
 
-        # perform recourse on the selected subset
-        selected_subset = Dataset(data[selected_indices], labels[selected_indices].unsqueeze(1))
-        recourse_weight = getWeights(self.train.x.shape[1], COSTWEIGHT)
-        recourse(
-            self.model,
-            selected_subset,
-            100,
-            recourse_weight,
-            loss_list=[],
-            threshold=THRESHOLD,
-            cost_list=self.avgRecourseCost_list,
-            q3RecourseCost=self.q3RecourseCost,
-            recourseModelLossList=self.recourseModelLossList,
-            isNew = isNewList[selected_indices],
-            new_cost_list=self.avgNewRecourseCostList,
-            original_cost_list=self.avgOriginalRecourseCostList
-        )
-        recoursed_data = selected_subset.x
-        self.train.x[selected_indices] = recoursed_data
+            # perform recourse on the selected subset
+            selected_subset = Dataset(data[selected_indices], labels[selected_indices].unsqueeze(1))
+            recourse_weight = getWeights(self.train.x.shape[1], COSTWEIGHT)
+            recourse(
+                self.model,
+                selected_subset,
+                100,
+                recourse_weight,
+                loss_list=[],
+                threshold=THRESHOLD,
+                cost_list=self.avgRecourseCost_list,
+                q3RecourseCost=self.q3RecourseCost,
+                recourseModelLossList=self.recourseModelLossList,
+                isNew = isNewList[selected_indices],
+                new_cost_list=self.avgNewRecourseCostList,
+                original_cost_list=self.avgOriginalRecourseCostList
+            )
+            recoursed_data = selected_subset.x
+            self.train.x[selected_indices] = recoursed_data
 
-        # update the labels of D using topk method
-        with pt.no_grad():
-          y_prob_all: pt.Tensor = self.model(self.train.x)
-        y_prob_all = y_prob_all
-        sorted_indices = pt.argsort(y_prob_all[:, 0], dim=0, descending=True)
-        cutoff_index = int(len(sorted_indices) * POSITIVE_RATIO)
-        mask = pt.zeros_like(y_prob_all)
-        mask[sorted_indices[:cutoff_index]] = 1
-        self.train.y = mask.float().squeeze(1)
+            # update the labels of D using topk method
+            with pt.no_grad():
+                y_prob_all: pt.Tensor = self.model(self.train.x)
+            sorted_indices = pt.argsort(y_prob_all[:, 0], dim=0, descending=True)
+            cutoff_index = int(len(sorted_indices) * POSITIVE_RATIO)
+            mask = pt.zeros_like(y_prob_all)
+            mask[sorted_indices[:cutoff_index]] = 1
+            self.train.y = mask.float().squeeze(1)
 
-        # train the model with the updated dataset
-        training(self.model, self.train, 50, self.test,loss_list=self.RegreesionModelLossList,val_loss_list=self.RegreesionModel_valLossList,printLoss=True)
+            # train the model with the updated dataset
+            training(self.model, self.train, 50, self.test,loss_list=self.RegreesionModelLossList,val_loss_list=self.RegreesionModel_valLossList,printLoss=True)
 
         #calculate metrics: ========================================================================
         #calculate short term accuracy
@@ -108,11 +108,14 @@ class Exp2(Helper):
         self.historyTrainList.append(current_data)
         self.overall_acc_list.append(self.calculate_AA(self.model, self.historyTrainList, 7))
 
-        #calculate ftr
-        recourseFailCnt = pt.where(self.train.y[selected_indices] == 0)[0].shape[0]
-        recourseFailRate = recourseFailCnt / len(self.train.y[selected_indices])
-        self.failToRecourse.append(recourseFailRate)
-        print("recourseFailRate: ",recourseFailRate)
+        if self.round != 1:
+            #calculate ftr
+            recourseFailCnt = pt.where(self.train.y[selected_indices] == 0)[0].shape[0]
+            recourseFailRate = recourseFailCnt / len(self.train.y[selected_indices])
+            self.failToRecourse.append(recourseFailRate)
+            print("recourseFailRate: ",recourseFailRate)
+        else:
+            self.failToRecourse.append(0)
 
         #jsd is calculated in helper.py already
 
@@ -139,7 +142,7 @@ class Exp2(Helper):
 
 exp2 = Exp2(model, pca, train, test, sample)
 exp2.save_directory = DIRECTORY
-ani1 = exp2.animate_all(100)
+ani1 = exp2.animate_all(101)
 current_time = datetime.datetime.now().strftime("%d-%H-%M")
 ani1.save(os.path.join(DIRECTORY, f"{RECOURSENUM}_{THRESHOLD}_{POSITIVE_RATIO}_{COSTWEIGHT}_{DATASET}_{current_time}.mp4"))
 exp2.draw_avgRecourseCost()

@@ -9,7 +9,7 @@ from Models.MLP import MLP
 from Models.synapticIntelligence import SynapticIntelligence, continual_training
 
 POSITIVE_RATIO = 0.5
-train, test, sample, dataset = make_dataset(700, 500, 2500, POSITIVE_RATIO, 'UCIcredit')
+train, test, sample, dataset = make_dataset(700, 500, 2500, POSITIVE_RATIO, 'synthetic')#2000,500,7500
 model = MLP(train.x.shape[1], 1)
 loss_list = []
 criterion = nn.BCELoss()

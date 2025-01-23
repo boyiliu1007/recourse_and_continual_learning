@@ -10,21 +10,17 @@ import numpy as np
 class Recourse(nn.Module):
     def __init__(self, size):
         super().__init__()
-        self.action = nn.Parameter(pt.zeros(size))
+        self.action = nn.Parameter(pt.zeros(size))  
+        self.mask = pt.zeros(size)  
 
-    # def forward(self, x: pt.Tensor, weight: pt.Tensor | None = None):
+        self.mask[:, :17] = 1  
+
     def forward(self, x: pt.Tensor, weight: pt.Tensor = None):
+        # a = self.action * self.mask.detach()
         a = self.action
-        # print("a",a)
-
-        #to be implement
-        #add cost funtion weight
-
-        # if weight is not None:
-        #     a = a * weight
         x = x + a
-        cost = deepcopy(a)
-        return x,cost
+        cost = a.detach().clone()
+        return x, cost
 
 
 # def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.Tensor | None = None, loss_list: list | None = None):

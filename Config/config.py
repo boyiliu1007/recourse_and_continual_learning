@@ -7,7 +7,7 @@ from Models.logisticRegression import LogisticRegression
 from Models.logisticRegression import training
 
 POSITIVE_RATIO = 0.5  #5000,1500,7500
-train, test, sample, dataset = make_dataset(700, 500, 7500,POSITIVE_RATIO,'UCIcredit')#2000,500,7500
+train, test, sample, dataset = make_dataset(700, 500, 2500,POSITIVE_RATIO,'synthetic')#2000,500,7500
 
 
 # train, test, sample, dataset = make_dataset(1000, 250, 5000,POSITIVE_RATIO,'credit')
