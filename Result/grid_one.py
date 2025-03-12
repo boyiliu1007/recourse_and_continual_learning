@@ -4,16 +4,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Define the dataset and metrics
-dataset = "synthetic"
+dataset = "credit"
 metrics_list = ["t_rate", "model_shift", "acc"]
 
 # Folder paths
 folder_paths = {
-    "Folder2": "New Experiments/diversek_MLP_output/one2",
-    "Folder3": "New Experiments/topk_continual_static_MLP_output/one2",
-    "Folder4": "New Experiments/topk_MLP_output/one2",
-    "Folder5": "New Experiments/diversek_continual_MLP_output/one2",
-    "Folder6": "New Experiments/topk_continual_MLP_output/one2",
+    "Folder2": "New Experiments/diversek_output/0.7_1",
+    "Folder3": "New Experiments/topk_continual_static_output/0.7_1",
+    "Folder4": "New Experiments/topk_output/0.7_1",
+    "Folder5": "New Experiments/diversek_continual_output/0.7_1",
+    "Folder6": "New Experiments/topk_continual_output/0.7_1",
 }
 
 # Dictionary to store extracted data
@@ -47,7 +47,7 @@ for folder_name, folder_path in folder_paths.items():
                     cleaned_values = []
 
                     # Skip first 6 values if metric is "acc", otherwise skip 3
-                    skip_count = 1 if metric == "acc" else 0
+                    skip_count = 1 if metric == "acc" or metric == "model_shift" else 0
                     values = values[skip_count:]
 
                     for val in values:
@@ -71,10 +71,10 @@ print("Data dictionary preview:", data_dict)
 # Colors and labels
 colors = {
     "Folder2": "#ff7f0e",
-    "Folder3": "#2ca02c",
-    "Folder4": "#d62728",
-    "Folder5": "#9467bd",
-    "Folder6": "#8c564b"
+    "Folder3": "#1f77b4",
+    "Folder4": "#9467bd",
+    "Folder5": "#d62728",
+    "Folder6": "#2ca02c"
 }
 linestyles = {
     "Folder2": "-",
@@ -84,16 +84,16 @@ linestyles = {
     "Folder6": "-",
 }
 labels = {
-    "Folder2": "fair-topk",
-    "Folder3": "topk-continual-static-lambda",
-    "Folder4": "topk",
-    "Folder5": "fair-topk-continual-lambda",
-    "Folder6": "topk-continual"
+    "Folder2": "Fair Top-k",
+    "Folder3": "Top-k with static continual learning",
+    "Folder4": "Top-k",
+    "Folder5": "Fair Top-k with DCL",
+    "Folder6": "Top-k with DCL",
 }
 
 # Y-axis limits for each metric
 y_limits = {
-    "t_rate": (0, 20),
+    "t_rate": (0, 1.5),
     "model_shift": (0, 5),
     "acc": (0.5, 1)
 }
@@ -122,8 +122,10 @@ for metric in metrics_list:
     for folder_name in folder_paths.keys():
         values = data_dict[folder_name][metric]  # Access the correct metric directly
         if values:
-            line, = ax.plot(values, linestyle=linestyles[folder_name], alpha=0.8,
-                            color=colors[folder_name], linewidth=2, label=labels[folder_name])
+            x_values = np.arange(1, len(values) + 1) if metric == "acc" or metric == "model_shift" else np.arange(len(values))
+            line_alpha = 1.0 if folder_name in ["Folder2", "Folder5"] else 0.5
+            line, = ax.plot(x_values, values, linestyle=linestyles[folder_name], alpha=line_alpha,
+                        color=colors[folder_name], linewidth=2, label=labels[folder_name])
 
             # Collect legend handles only once
             if labels[folder_name] not in legend_labels:
@@ -131,34 +133,51 @@ for metric in metrics_list:
                 legend_labels.append(labels[folder_name])
 
     # Set y-axis limit dynamically based on the metric
-    if metric in y_limits:
+    if metric == "acc":
+        ax.margins(y=0.1)  # Adds 10% extra space above the highest point
+    elif metric in y_limits:
         ax.set_ylim(y_limits[metric])
 
-    ax.grid(True, linestyle=":", alpha=0.5)
+    ax.margins(y=0.1)
+    ax.grid(True, linestyle=":", alpha=0.6)
+    ax.tick_params(axis='both', which='major', labelsize=20)
 
     # Only show side titles for "t_rate"
     if metric == "t_rate":
-        ax.set_ylabel("Synthetic Dataset", fontsize=16, fontweight="normal")
+        ax.set_ylabel("Logistic Model", fontsize=23, fontweight="normal")
 
     # Add title
     title_map = {
-        "t_rate": "Test Acceptance Rate",
-        "model_shift": "Model Shift",
-        "acc": "Short-Term Accuracy"
-    }
-    fig.suptitle(title_map.get(metric, ""), fontsize=16, fontweight="normal")
+    "t_rate": "Test Acceptance Rate",
+    "model_shift": "Model Shift",
+    "acc": "Short-Term Accuracy"
+}
+
+    ax.set_title(title_map.get(metric, ""), fontsize=23, fontweight="normal", pad=15)
+    # fig.suptitle(title_map.get(metric, ""), fontsize=23, fontweight="normal")
 
     # Save the individual metric plot
-    plt.savefig(f"Result/{metric}1_comparison.png")
+    plt.savefig(f"Result/LT0.7_1{metric}_comparison.png")
     plt.show()
 
 # Create a separate legend plot
-fig_legend, ax_legend = plt.subplots(figsize=(8, 2))
+fig_legend, ax_legend = plt.subplots(figsize=(20,1.5))
 ax_legend.axis("off")  # Hide axes
 
 # Create a legend
-ax_legend.legend(legend_handles, legend_labels, loc="center", fontsize=12, frameon=True, ncol=2)
+preferred_order = ["Fair Top-k", "Fair Top-k with DCL"]
+
+# Sort handles and labels based on the preferred order
+sorted_legend = sorted(zip(legend_labels, legend_handles), key=lambda x: preferred_order.index(x[0]) if x[0] in preferred_order else len(preferred_order))
+
+# Unzip the sorted legend
+legend_labels, legend_handles = zip(*sorted_legend)
+
+# Create the legend with the new order
+ax_legend.legend(legend_handles, legend_labels, loc="upper center", 
+                 fontsize=20, frameon=True, ncol=3)
+
 
 # Save the legend as a separate plot
-plt.savefig("Result/legend_plot.png")
+plt.savefig("Result/LTlegend_plot.png")
 plt.show()

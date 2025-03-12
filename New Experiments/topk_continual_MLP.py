@@ -26,8 +26,8 @@ current_file_name = os.path.splitext(current_file_name)[0]
 DIRECTORY = os.path.join(current_directory, f"{current_file_name}_output")
 
 # modified parameters for observations
-THRESHOLD = 0.7
-RECOURSENUM = 0.5
+THRESHOLD = 0.9
+RECOURSENUM = 0.7
 COSTWEIGHT = 'uniform'
 DATASET = dataset
 
@@ -51,54 +51,55 @@ class Exp3(Helper):
         #save model parameters
         self.model_params = deepcopy(self.model.state_dict())
 
-        #randomly select from self.sample with size of train and label it with model
-        self.train, isNewList = update_train_data(self.train, self.sample, self.model, 'mixed')
+        if self.round != 1:
+            #randomly select from self.sample with size of train and label it with model
+            self.train, isNewList = update_train_data(self.train, self.sample, self.model, 'mixed')
 
-        # find training data with label 0 and select 1/5 of them
-        data, labels = self.train.x, self.train.y
-        label_0_indices = pt.where(labels == 0)[0]
-        shuffled_indices = pt.randperm(len(label_0_indices))
-        label_0_indices = label_0_indices[shuffled_indices]
-        num_samples = math.floor(len(label_0_indices) * RECOURSENUM)
-        selected_indices = label_0_indices[:num_samples]
+            # find training data with label 0 and select 1/5 of them
+            data, labels = self.train.x, self.train.y
+            label_0_indices = pt.where(labels == 0)[0]
+            shuffled_indices = pt.randperm(len(label_0_indices))
+            label_0_indices = label_0_indices[shuffled_indices]
+            num_samples = math.floor(len(label_0_indices) * RECOURSENUM)
+            selected_indices = label_0_indices[:num_samples]
 
-        # perform recourse on the selected subset
-        selected_subset = Dataset(data[selected_indices], labels[selected_indices].unsqueeze(1))
-        recourse_weight = getWeights(self.train.x.shape[1], COSTWEIGHT)
-        recourse(
-            self.model,
-            selected_subset,
-            100,
-            recourse_weight,
-            loss_list=[],
-            threshold=THRESHOLD,
-            cost_list=self.avgRecourseCost_list,
-            q3RecourseCost=self.q3RecourseCost,
-            recourseModelLossList=self.recourseModelLossList,
-            isNew = isNewList[selected_indices],
-            new_cost_list=self.avgNewRecourseCostList,
-            original_cost_list=self.avgOriginalRecourseCostList
-        )
-        recoursed_data = selected_subset.x
-        self.train.x[selected_indices] = recoursed_data
+            # perform recourse on the selected subset
+            selected_subset = Dataset(data[selected_indices], labels[selected_indices].unsqueeze(1))
+            recourse_weight = getWeights(self.train.x.shape[1], COSTWEIGHT)
+            recourse(
+                self.model,
+                selected_subset,
+                100,
+                recourse_weight,
+                loss_list=[],
+                threshold=THRESHOLD,
+                cost_list=self.avgRecourseCost_list,
+                q3RecourseCost=self.q3RecourseCost,
+                recourseModelLossList=self.recourseModelLossList,
+                isNew = isNewList[selected_indices],
+                new_cost_list=self.avgNewRecourseCostList,
+                original_cost_list=self.avgOriginalRecourseCostList
+            )
+            recoursed_data = selected_subset.x
+            self.train.x[selected_indices] = recoursed_data
 
-        # update the labels of D using topk method
-        with pt.no_grad():
-          y_prob_all: pt.Tensor = self.model(self.train.x)
-        sorted_indices = pt.argsort(y_prob_all[:, 0], dim=0, descending=True)
-        cutoff_index = int(len(sorted_indices) * POSITIVE_RATIO)
-        mask = pt.zeros_like(y_prob_all)
-        mask[sorted_indices[:cutoff_index]] = 1
-        self.train.y = mask.float().squeeze(1)
+            # update the labels of D using topk method
+            with pt.no_grad():
+                y_prob_all: pt.Tensor = self.model(self.train.x)
+            sorted_indices = pt.argsort(y_prob_all[:, 0], dim=0, descending=True)
+            cutoff_index = int(len(sorted_indices) * POSITIVE_RATIO)
+            mask = pt.zeros_like(y_prob_all)
+            mask[sorted_indices[:cutoff_index]] = 1
+            self.train.y = mask.float().squeeze(1)
 
-        # train the model with the updated dataset
-        if(self.jsd_list == []):
-            continual_training(self.si, self.train, 50, lambda_ = 0)
-        else:
-            continual_training(self.si, self.train, 50, lambda_ = 0.0000001/(self.jsd_list[-1]))
+            # train the model with the updated dataset
+            if(self.jsd_list == []):
+                continual_training(self.si, self.train, 50, lambda_ = 0)
+            else:
+                continual_training(self.si, self.train, 50, lambda_ = 0.0000001/(self.jsd_list[-1]))
 
-        self.si.update_omega(self.train, nn.BCELoss())
-        self.si.consolidate(3)
+            self.si.update_omega(self.train, nn.BCELoss())
+            self.si.consolidate(3)
         #calculate metrics: ========================================================================
         #calculate short term accuracy
         current_data = Dataset(self.train.x, self.train.y)
@@ -106,12 +107,37 @@ class Exp3(Helper):
         self.overall_acc_list.append(self.calculate_AA(self.model, self.historyTrainList, 7))
         
 
-        #calculate ftr
-        recourseFailCnt = pt.where(self.train.y[selected_indices] == 0)[0].shape[0]
-        recourseFailRate = recourseFailCnt / len(self.train.y[selected_indices])
-        self.failToRecourse.append(recourseFailRate)
+        if self.round != 1:
+            #calculate ftr
+            recourseFailCnt = pt.where(self.train.y[selected_indices] == 0)[0].shape[0]
+            recourseFailRate = recourseFailCnt / len(self.train.y[selected_indices])
+            self.failToRecourse.append(recourseFailRate)
+            print("recourseFailRate: ",recourseFailRate)
+
+            #calculate ftr_old
+            new_indices = isNewList[selected_indices]
+            old_selected_indices = selected_indices[new_indices == False]
+            # print(f"old_selected_indices: {len(old_selected_indices)}")
+            recourseFailCnt_old = pt.where(self.train.y[old_selected_indices] == 0)[0].shape[0]
+            recourseFailRate_old = recourseFailCnt_old / len(self.train.y[old_selected_indices])
+            self.failToRecourse_old.append(recourseFailRate_old)
+            print("recourseFailRate_old: ",recourseFailRate_old)
+            
+            #calculate ftr_new
+            new_selected_indices = selected_indices[new_indices == True]
+            # print(f"new_selected_indices: {len(new_selected_indices)}")
+            recourseFailCnt_new = pt.where(self.train.y[new_selected_indices] == 0)[0].shape[0]
+            recourseFailRate_new = recourseFailCnt_new / len(self.train.y[new_selected_indices])
+            self.failToRecourse_new.append(recourseFailRate_new)
+            print("recourseFailRate_new: ",recourseFailRate_new)
+
+        else:
+            self.failToRecourse.append(0)
+            self.failToRecourse_old.append(0)
+            self.failToRecourse_new.append(0)
 
         #jsd is calculated in helper.py already
+
         #calculate t_rate
         with pt.no_grad():
             y_prob: pt.Tensor = self.model(test.x)
@@ -132,11 +158,12 @@ class Exp3(Helper):
         self.model_shift_distance_list.append(shift_distance)
 
 
+
 exp3 = Exp3(si.model, pca, train, test, sample)
 exp3.si = si
 exp3.save_directory = DIRECTORY
 current_time = datetime.datetime.now().strftime("%d-%H-%M")
-ani1 = exp3.animate_all(100)
+ani1 = exp3.animate_all(101)
 ani1.save(os.path.join(DIRECTORY, f"{RECOURSENUM}_{THRESHOLD}_{POSITIVE_RATIO}_{COSTWEIGHT}_{DATASET}_{current_time}.mp4"))
 exp3.draw_avgRecourseCost()
 exp3.plot_jsd()
@@ -153,5 +180,7 @@ FileSaver(exp3.failToRecourse,
           exp3.avgNewRecourseCostList, 
           exp3.avgOriginalRecourseCostList,
           exp3.t_rate_list,
-          exp3.model_shift_distance_list
+          exp3.model_shift_distance_list,
+          exp3.failToRecourse_old,
+          exp3.failToRecourse_new
         ).save_to_csv(RECOURSENUM, THRESHOLD, POSITIVE_RATIO, COSTWEIGHT, DATASET, current_time, DIRECTORY)

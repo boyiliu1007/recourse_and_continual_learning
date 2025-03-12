@@ -25,7 +25,7 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from Config.MLP_config import test, train, sample
+from Config.continual_config import test, train, sample
 from Models.synapticIntelligence import SynapticIntelligence
 
 pca = PCA(2).fit(train.x)
@@ -96,6 +96,8 @@ class Helper:
         self.t_rate_list = []
         self.model_params = None
         self.model_shift_distance_list = []
+        self.failToRecourse_old = []
+        self.failToRecourse_new = [] 
 
     # def draw_proba_hist(self, ax: Axes | None = None, *, label: bool = False):
     def draw_proba_hist(self, ax: Axes = None, *, label: bool = False):
@@ -198,7 +200,8 @@ class Helper:
         )
         ax0.set_xlabel('pca0')
         ax0.set_ylabel('pca1')
-        ax0.set_title('Train')
+        ax0.set_title('User Responded Dataset')
+        
 
         with pt.no_grad():
             y_prob: pt.Tensor = self.model(test.x)
@@ -238,7 +241,7 @@ class Helper:
         fig.colorbar(self._ct_test, ax=ax1, label='probability')
         ax1.grid(alpha=0.75)
         ax1.set_xlabel('pca0')
-        ax1.set_title('Test')
+        ax1.set_title('Test Dataset')
 
         return fig, axes
 

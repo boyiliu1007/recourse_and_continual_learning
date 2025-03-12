@@ -32,8 +32,8 @@ current_file_name = os.path.splitext(current_file_name)[0]
 DIRECTORY = os.path.join(current_directory, f"{current_file_name}_output")
 
 # modified parameters for observations
-THRESHOLD = 0.7            #0.5 0.7 0.9
-RECOURSENUM = 0.5          #0.2 0.5 0.7
+THRESHOLD = 0.9            #0.5 0.7 0.9
+RECOURSENUM = 0.7          #0.2 0.5 0.7
 COSTWEIGHT = 'uniform'     #uniform log
 DATASET = dataset
 
@@ -117,9 +117,28 @@ class Exp2(Helper):
             recourseFailRate = recourseFailCnt / len(self.train.y[selected_indices])
             self.failToRecourse.append(recourseFailRate)
             print("recourseFailRate: ",recourseFailRate)
+
+            #calculate ftr_old
+            new_indices = isNewList[selected_indices]
+            old_selected_indices = selected_indices[new_indices == False]
+            # print(f"old_selected_indices: {len(old_selected_indices)}")
+            recourseFailCnt_old = pt.where(self.train.y[old_selected_indices] == 0)[0].shape[0]
+            recourseFailRate_old = recourseFailCnt_old / len(self.train.y[old_selected_indices])
+            self.failToRecourse_old.append(recourseFailRate_old)
+            print("recourseFailRate_old: ",recourseFailRate_old)
+            
+            #calculate ftr_new
+            new_selected_indices = selected_indices[new_indices == True]
+            # print(f"new_selected_indices: {len(new_selected_indices)}")
+            recourseFailCnt_new = pt.where(self.train.y[new_selected_indices] == 0)[0].shape[0]
+            recourseFailRate_new = recourseFailCnt_new / len(self.train.y[new_selected_indices])
+            self.failToRecourse_new.append(recourseFailRate_new)
+            print("recourseFailRate_new: ",recourseFailRate_new)
+
         else:
             self.failToRecourse.append(0)
-            print("recourseFailRate: ",0)
+            self.failToRecourse_old.append(0)
+            self.failToRecourse_new.append(0)
 
         #jsd is calculated in helper.py already
 
@@ -165,5 +184,7 @@ FileSaver(exp2.failToRecourse,
           exp2.avgNewRecourseCostList, 
           exp2.avgOriginalRecourseCostList,
           exp2.t_rate_list,
-          exp2.model_shift_distance_list
+          exp2.model_shift_distance_list,
+          exp2.failToRecourse_old,
+          exp2.failToRecourse_new
         ).save_to_csv(RECOURSENUM, THRESHOLD, POSITIVE_RATIO, COSTWEIGHT, DATASET, current_time, DIRECTORY)
