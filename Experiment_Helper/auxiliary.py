@@ -16,6 +16,22 @@ def getWeights(feature_num, type = 'uniform'):
         weights = np.array([getFunc(i) for i in range(1, feature_num + 1)])
         weights = weights / np.sum(weights)  # Normalize the weights
         return pt.from_numpy(weights)
+    elif(type == 'extreme'):
+        weights = pt.ones(feature_num)
+        weights[0] = 0.01
+        weights[1] = 0.01
+        weights[2] = 0.01
+        weights[3] = 0.01
+        weights[4] = 0.01
+    
+    elif(type == 'extreme2'):
+        weights = pt.ones(feature_num)
+        weights[16] = 0.01
+        weights[18] = 0.01
+        weights[7] = 0.01
+        weights[13] = 0.01
+        
+        return weights
     else:
         print("type is incorrect at getWeights")
 

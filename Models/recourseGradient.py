@@ -11,9 +11,9 @@ class Recourse(nn.Module):
     def __init__(self, size):
         super().__init__()
         self.action = nn.Parameter(pt.zeros(size))  
-        self.mask = pt.zeros(size)  
+        # self.mask = pt.zeros(size)  
 
-        self.mask[:, :17] = 1  
+        # self.mask[:, :17] = 1  
 
     def forward(self, x: pt.Tensor, weight: pt.Tensor = None):
         # a = self.action * self.mask.detach()
@@ -27,41 +27,47 @@ class Recourse(nn.Module):
 def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.Tensor = None, loss_list: list = None,cost_list = None,threshold = 1.0,q3RecourseCost: list = None,recourseModelLossList: list = None, isNew = None, new_cost_list = None, original_cost_list = None):
     loss: pt.Tensor
     r_model = Recourse(dataset.x.shape)
-    criterion = nn.HuberLoss()
-    optimizer = optim.Adam(r_model.parameters(), 0.1)
-    # print("Enter Recourse",c_model.state_dict())
-    # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+    criterion = nn.BCEWithLogitsLoss()
+    optimizer = optim.Adam(r_model.parameters(), lr=0.1)
     
     # threshold = pt.ones(dataset.y.size())
-    threshold = pt.ones(dataset.y.size()).fill_(threshold)
-    # print("threshold : ",threshold)
+    threshold_v = pt.ones(dataset.y.size()).fill_(threshold)
+    
 
     r_model.train()
     for _ in range(max_epochs):
-        # optimizer.zero_grad()
+        
         x_hat,cost = r_model(dataset.x)
-        # print("cost: ",cost)
+        
         y_hat = c_model(x_hat)
-        # print("y_hat: ",y_hat)
-        #lamda = 0.5
         # loss = criterion(y_hat, dataset.y) + 0.3 * pt.pow(pt.sum((cost * weight) * (cost * weight)),1/2)
-        loss = criterion(y_hat, threshold) + 0.3 * pt.pow(pt.sum((cost * weight) * (cost * weight)),1/2)
-        # print("loss: ",loss.item())
-        #clear gradient
+        # bceloss = criterion(y_hat, threshold_v)
+
+        output_margin = y_hat - 0.7
+        target_margin = pt.ones_like(y_hat) * 0.001  # push slightly over
+        
+        margin_loss = (pt.relu(target_margin - output_margin)* weight * 100000).mean()
+
+        cost_constraint = pt.pow(pt.sum(weight * cost * cost), 1/2)
+        loss = margin_loss + 1 * cost_constraint
+        
         optimizer.zero_grad()
-        #calculate gradient
         loss.backward()
-        #do gradient descent
         optimizer.step()
-        # optimizer.zero_grad()
-        #why need c_model.zero_grad()?
-        c_model.zero_grad()
-        # scheduler.step(loss)
+        
         if loss_list is not None:
             loss_list.append(loss.item())
+
+    dataset.x = x_hat.detach().clone()
+    dataset.y = (y_hat.detach().clone() > 0.5).float()
     r_model.eval()
     if(recourseModelLossList is not None):
         recourseModelLossList.append(loss.item())
+    
+    with pt.no_grad():
+        y_hat = c_model(dataset.x)
+        print("y_hat",y_hat.squeeze())
+        print("recourse action", cost)
 
     with pt.no_grad():
         recourseCostLimit = 100
@@ -77,24 +83,30 @@ def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.T
             for idx,t in enumerate(cost):
                 # if the idx matches isNew then count it as new recoursecost
                 # otherwise not
-                L2_cost = pt.pow(pt.sum((t * weight) * (t * weight)),1/2)
-                if(isNew[idx]):
+                L2_cost = pt.pow(pt.sum(weight * t * t), 1/2)
+                if (idx < isNew.size(0) and isNew[idx]):
                     newCount += 1
                     avgNewRecourseCost += L2_cost
                 else:
                     avgOriginalRecourseCost += L2_cost
                 a = c_model(recourseX[idx])
-                recourseGradient = a -  (1 / recourseLambda) * pt.pow(pt.sum((t * weight) * (t * weight)),1/2)
+                recourseGradient = a -  (1 / recourseLambda) * pt.pow(pt.sum(weight * t * t), 1/2)
                 if recourseGradient >= 0:
                     dataset.x[idx] = recourseX[idx]
                 avgRecourseCost += L2_cost
                 recourseCostList.append(L2_cost.item())
+
             if len(cost) == 0:
                 avgRecourseCost = -1
             else:
                 avgRecourseCost /= len(cost)
-                avgNewRecourseCost /= newCount
-                avgOriginalRecourseCost /= (len(cost) - newCount)
+                if pt.any(isNew != 0):
+                    avgNewRecourseCost /= newCount
+                    avgOriginalRecourseCost /= (len(cost) - newCount)
+                else:
+                    avgNewRecourseCost = pt.zeros(1)
+                    avgOriginalRecourseCost = pt.zeros(1)
+
                 
             if q3RecourseCost is not None:
                 q3RecourseCost.append(np.quantile(recourseCostList,0.75))
@@ -103,6 +115,9 @@ def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.T
             cost_list.append(avgRecourseCost.item())
             original_cost_list.append(avgOriginalRecourseCost.item())
             new_cost_list.append(avgNewRecourseCost.item())
-            print("avgRecourseCost cost: ",avgRecourseCost.item())
-            print("avgNewRecourseCost: ",avgNewRecourseCost.item(), newCount)
-            print("avgOriginalRecourseCost ", avgOriginalRecourseCost.item(), len(cost) - newCount)
+            # print("avgRecourseCost cost: ",avgRecourseCost.item())
+            # print("avgNewRecourseCost: ",avgNewRecourseCost.item(), newCount)
+            # print("avgOriginalRecourseCost ", avgOriginalRecourseCost.item(), len(cost) - newCount)
+
+    
+    return dataset

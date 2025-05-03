@@ -14,6 +14,7 @@ from matplotlib.patches import Rectangle
 import torch as pt
 from torch import nn, optim
 from torch.utils.data import Dataset
+from Dataset.makeDataset import Dataset as makeDataset
 from copy import deepcopy
 import numpy as np
 from numpy.typing import NDArray
@@ -25,7 +26,7 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from Config.continual_config import test, train, sample
+from Config.config import test, train, sample
 from Models.synapticIntelligence import SynapticIntelligence
 
 pca = PCA(2).fit(train.x)
@@ -39,7 +40,10 @@ class Helper:
         print(self.model)
         self.pca = pca
         self.train = train
+        self.last_train = None
         self.test = test
+        self.recoursedFail = []
+        self.recoursedSuccess = []
         self.sample = sample
         self.avgRecourseCost_list = []
         self.avgRecourseCostOnNormalModel_list = [0.06159922992002644, 0.12086665188383333, 0.12428388443361009, 0.09327902214606151, 0.0914254747813962, 0.10181462205051678, 0.06512063602287499, 0.05560648227644058, 0.14264473209587378, 4.09476747603947e-10, 0.052722483241979104, 0.19565176651228425, 0.06654292898757293, 0.06011031716706189, 0.09046107084462783, 0.09270152840961687, 0.051453308538206, 0.03577024625382576, 0.016691426807023336, 0.08029367543314575, 0.026682426600765776, 0.03204131528429175, 0.04240766617553736, 0.014405035321681572, 0.04639084834714248, 0.050464024788218174, 0.012282079520451657, 0.05285377481895858, 0.059932515457909896, 0.04251443191028677, 0.05739795532695681, 0.05558917593451114, 0.028256987581770848, 6.73931037377352e-25, 0.09796421873509148, 0.03888524785536303, 0.04657775858007727, 0.05730771480139618, 1.5402928308309566e-06, 0.06509942725759371, 0.0491878879805011, 0.00039157206276569187, 0.07065706911599993, 0.06210125794068486, 0.04395887542651051, 0.043938844512779185, 0.02238094295522375, 0.062207699089470395, 0.08282516573412534, 0.09728769390268684, 0.044728735811752546, 0.037621906280156193, 0.05039526779801566, 0.050188176154787205, 0.024204884508321714, 3.260193750713085e-20, 0.09291165744579091, 0.02995874151072171, 0.008952477908322693, 0.052271700241058636, 8.04082868080906e-05, 0.03617987324863985, 0.0017337123456435944, 0.017247563861170864, 0.01080249299107777, 0.048440334502938, 1.4813621746908996e-16, 0.03357194517838013, 0.033571785361655185, 0.02210148653736829, 0.03650270177876014, 0.05248624145473789, 0.010576933945023938, 0.0670926706085056, 1.4454213688446538e-05, 0.02168657426886433, 0.02674180725114156, 0.029348920762914146, 0.07503762732903632]
@@ -78,11 +82,16 @@ class Helper:
         self.Aj_tide_list = []
         self.jsd_list = []
 
-        self._hist: list[BarContainer]
-        self._bins: NDArray
+        self._hist_last: list[BarContainer]
+        self._bins_last: NDArray
+        self._hist_current: list[BarContainer]
+        self._bins_current: NDArray
         self._sc_train: PathCollection
         self._sc_test: PathCollection
+        self._sc_recourse_fail: PathCollection
+        self._sc_recourse_success: PathCollection
         self._ct_test: QuadContourSet
+        self._ct_train: QuadContourSet
         self.lr = 0.1
         self.si: SynapticIntelligence
         self.save_directory = None
@@ -95,19 +104,79 @@ class Helper:
         self.train_size = 0
         self.t_rate_list = []
         self.model_params = None
+        self.first_model_params = None
         self.model_shift_distance_list = []
         self.failToRecourse_old = []
         self.failToRecourse_new = [] 
+        self.showRecoursedPoints = True
+        self.low_cost_model_shift_list = []
+        self.high_cost_model_shift_list = []
+        self.low_cost_feature_ranking = []
+        self.important_feature_ranking = []
 
     # def draw_proba_hist(self, ax: Axes | None = None, *, label: bool = False):
-    def draw_proba_hist(self, ax: Axes = None, *, label: bool = False):
-        if ax is None:
-            fig, ax = plt.subplots(figsize=(8, 4))
+    def draw_proba_hist(self, ax0: Axes = None, ax1: Axes = None, *, label: bool = False):
+        if ax0 is None:
+            fig0, ax0 = plt.subplots(figsize=(4, 4))
         else:
-            fig = ax.get_figure()
+            fig0 = ax0.get_figure()
+        if ax1 is None:
+            fig1, ax1 = plt.subplots(figsize=(4, 4))
+        else:
+            fig1 = ax1.get_figure()
 
-        x = self.test.x
-        y = self.test.y
+        # For ax0, using self.last_train
+        if hasattr(self, 'last_train') and self.last_train is not None:
+            x_last = self.last_train.x
+            y_last = self.last_train.y
+        else:
+            x_last = self.train.x
+            y_last = self.train.y
+
+        n_last = x_last.shape[0] #size of last_train data
+        m_last = n_last - pt.count_nonzero(y_last) #non zero size of last_train data 
+        
+        with pt.no_grad():
+            y_prob_last: pt.Tensor = self.model(x_last)
+
+        # Sorts the probabilities based on the order of the labels (groups by class)
+        y_last = y_last.flatten()
+        y_prob_last = y_prob_last.flatten()
+        y_prob_last = y_prob_last[y_last.argsort()] 
+
+        # Creates weights for the histogram - each sample contributes a percentage to make totals sum to 100%
+        w_last = np.broadcast_to(100 / n_last, n_last)
+
+        _, self._bins_last, self._hist_last = ax0.hist(
+            (y_prob_last[:m_last], y_prob_last[m_last:]),
+            10,
+            (0, 1),
+            weights=(w_last[:m_last], w_last[m_last:]),
+            rwidth=1,
+            color=self.palette,
+            label=(0, 1),
+            ec='w',
+            alpha=0.9,
+        )
+
+        ax0.legend(loc='upper center', title='Topk label')
+        ax0.set_xlabel('predicted probability')
+        ax0.set_ylabel('percentage')
+        ax0.set_title('User Responded Dataset on Model t - 1')
+
+        if label:
+            for c in self._hist_last:
+                height = map(Rectangle.get_height, c.patches)
+                ax0.bar_label(
+                    c,
+                    [f'{h}%' if h else '' for h in height],
+                    fontsize='xx-small'
+                )
+        ax0.set_ylim(0, 80)
+
+        # For ax1, using self.train
+        x = self.train.x
+        y = self.train.y
 
         n = x.shape[0]
         m = n - pt.count_nonzero(y)
@@ -121,8 +190,7 @@ class Helper:
 
         w = np.broadcast_to(100 / n, n)
 
-        self._hist: list[BarContainer]
-        _, self._bins, self._hist = ax.hist(
+        _, self._bins_current, self._hist_current = ax1.hist(
             (y_prob[:m], y_prob[m:]),
             10,
             (0, 1),
@@ -134,21 +202,21 @@ class Helper:
             alpha=0.9,
         )
 
-        ax.legend(loc='upper center', title='True label')
-        ax.set_xlabel('mean predicted probabilty')
-        ax.set_ylabel('percent')
-        ax.set_title('Probability Distribution')
+        ax1.legend(loc='upper center', title='Topk label')
+        ax1.set_xlabel('predicted probability')
+        ax1.set_title('User Responded Dataset on Model t')
 
         if label:
-            for c in self._hist:
+            for c in self._hist_current:
                 height = map(Rectangle.get_height, c.patches)
-                ax.bar_label(
+                ax1.bar_label(
                     c,
                     [f'{h}%' if h else '' for h in height],
                     fontsize='xx-small'
                 )
-        ax.set_ylim(0, 80)
-        return fig, ax
+        ax1.set_ylim(0, 80)
+        
+        return (fig0, ax0), (fig1, ax1)
 
     #calculate js divergence using training data after pca
     def js_divergence(self, pcaData, labelData):
@@ -169,40 +237,131 @@ class Helper:
         dens2 = np.exp(log_dens2)
 
         js_divergence = jensenshannon(dens1, dens2)
-        print("js_divergence: ",js_divergence)
+        # print("js_divergence: ",js_divergence)
         self.jsd_list.append(js_divergence)
 
     # def draw_dataset_scatter(self, axes: tuple[Axes, Axes] | None = None):
     def draw_dataset_scatter(self, axes: [Axes, Axes] = None):
         if axes is None:
+            # Increase the figure size for larger plotting area
             fig, (ax0, ax1) = plt.subplots(
                 1, 2,
                 sharex=True,
                 sharey=True,
                 figsize=(8, 4),
-                layout='compressed'
+                layout='constrained'
             )
         else:
             ax0, ax1 = axes
             fig = ax0.get_figure()
 
         prop = dict(cmap=self.cmap, s=40, vmin=0., vmax=1., lw=0.8, ec='w')
-
+        
+        # Standard scatter plot for training data
         self._sc_train = ax0.scatter(
             *pca.transform(self.train.x).T,
             c=self.train.y,
             **prop
         )
-        ax0.legend(
-            *self._sc_train.legend_elements(),
-            loc='upper right',
-            title='True label'
-        )
-        ax0.set_xlabel('pca0')
-        ax0.set_ylabel('pca1')
-        ax0.set_title('User Responded Dataset')
         
+        if(self.showRecoursedPoints):
+            # Extract the recoursedFail points from training data
+            if hasattr(self, 'recoursedFail') and len(self.recoursedFail) > 0:
+                # Convert recoursedFail to tensor indices if it's a list
+                if isinstance(self.recoursedFail, list):
+                    recourse_fail_indices = pt.tensor(self.recoursedFail, dtype=pt.long)
+                else:
+                    recourse_fail_indices = self.recoursedFail
+                    
+                # Get the PCA-transformed coordinates of recourse points
+                recourse_fail_points = pca.transform(self.train.x[recourse_fail_indices])
+                
+                # Plot the recoursedFail points in green over the original scatter plot
+                self._sc_recourse_fail = ax0.scatter(
+                    *recourse_fail_points.T,
+                    s=40,  
+                    lw=0.8, 
+                    ec='w',
+                    color='purple',      
+                )
+                
+            else:
+                # Initialize with empty data so the attribute exists
+                self._sc_recourse_fail = ax0.scatter(
+                    [], 
+                    [], 
+                    s=40,  
+                    lw=0.8, 
+                    ec='w',
+                    color='purple',
+                )
+            
+            # Extract the recoursedSuccess points from training data
+            if hasattr(self, 'recoursedSuccess') and len(self.recoursedSuccess) > 0:
+                # Convert recoursedSuccess to tensor indices if it's a list
+                if isinstance(self.recoursedSuccess, list):
+                    recourse_success_indices = pt.tensor(self.recoursedSuccess, dtype=pt.long)
+                else:
+                    recourse_success_indices = self.recoursedSuccess
+                    
+                # Get the PCA-transformed coordinates of recoursedSuccess points
+                recourse_success_points = pca.transform(self.train.x[recourse_success_indices])
+                
+                # Plot the recoursedFail points in green over the original scatter plot
+                self._sc_recourse_success = ax0.scatter(
+                    *recourse_success_points.T,
+                    s=40,  
+                    lw=0.8, 
+                    ec='w',
+                    color='red',      
+                )
+                
+            else:
+                # Initialize with empty data so the attribute exists
+                self._sc_recourse_success = ax0.scatter(
+                    [], 
+                    [], 
+                    s=40,  
+                    lw=0.8, 
+                    ec='w',
+                    color='red',
+                )
 
+        if(self.showRecoursedPoints):
+            handles = []
+            labels = []
+            # Add training scatter points to legend (if needed)
+            if hasattr(self, '_sc_train'):
+                train_handles, train_labels = self._sc_train.legend_elements()
+                handles.extend(train_handles)
+                labels.extend([label for label in train_labels])
+
+            # Add recourse success points to legend
+            if hasattr(self, '_sc_recourse_success'):
+                handles.append(self._sc_recourse_success)
+                labels.append('R_1')
+
+            # Add recourse fail points to legend
+            if hasattr(self, '_sc_recourse_fail'):
+                handles.append(self._sc_recourse_fail)
+                labels.append('R_0')
+
+            # Create the combined legend
+            ax0.legend(handles, labels, loc='upper right', title='topk label')
+        
+        else:
+            ax0.legend(
+                *self._sc_train.legend_elements(),
+                loc='upper right',
+                title='topk label'
+            )
+
+        # Add PCA variance to labels
+        ax0.set_xlabel(f'PCA1')
+        ax0.set_ylabel(f'PCA2')
+        ax0.grid(alpha=0.75)
+        ax0.set_title('User Responded Dataset at time t')
+        
         with pt.no_grad():
             y_prob: pt.Tensor = self.model(test.x)
 
@@ -217,19 +376,38 @@ class Helper:
         ax1.legend(
             *self._sc_test.legend_elements(),
             loc='upper right',
-            title='Predicted'
+            title='model label'
         )
 
         x0, x1 = ax0.get_xlim()
         y0, y1 = ax0.get_ylim()
-        n = 32
-        xy = np.mgrid[x0: x1: n * 1j, y0: y1: n * 1j]
-        z = pca.inverse_transform(xy.reshape(2, n * n).T)
+        
+        # Increase the expand factor for larger PCA area
+        expand_factor = 1.0
+        x_range = (x1 - x0) * expand_factor
+        y_range = (y1 - y0) * expand_factor
 
+        # Set new limits
+        ax0.set_xlim([x0 - x_range, x1 + x_range])
+        ax0.set_ylim([y0 - y_range, y1 + y_range])
+        ax1.set_xlim([x0 - x_range, x1 + x_range])
+        ax1.set_ylim([y0 - y_range, y1 + y_range])
+        
+        # Increase grid resolution for smoother contours
+        n = 32
+        x_expanded = np.linspace(x0 - x_range, x1 + x_range, n)
+        y_expanded = np.linspace(y0 - y_range, y1 + y_range, n)
+
+        xy = np.meshgrid(x_expanded, y_expanded)
+
+        z = pca.inverse_transform(np.c_[xy[0].ravel(), xy[1].ravel()])
         z = pt.tensor(z, dtype=pt.float)
+
+        # Evaluate the model on the expanded grid
         with pt.no_grad():
-            z: pt.Tensor = self.model(z)
+            z = self.model(z)
         z = z.view(n, n)
+        
         self._ct_test = ax1.contourf(
             *xy, z, 10,
             cmap='RdYlBu_r',
@@ -238,25 +416,40 @@ class Helper:
             alpha=0.9,
             zorder=0,
         )
+        
+        # Also add the contour to the first plot
+        self._ct_train = ax0.contourf(
+            *xy, z, 10,
+            cmap='RdYlBu_r',
+            vmin=0,
+            vmax=1,
+            alpha=0.9,
+            zorder=0,
+        )
+        
         fig.colorbar(self._ct_test, ax=ax1, label='probability')
-        ax1.grid(alpha=0.75)
-        ax1.set_xlabel('pca0')
-        ax1.set_title('Test Dataset')
+        ax1.grid(alpha=0.75) 
+        
+        # Also update the x-label for the second plot
+        ax1.set_xlabel(f'PCA1')
+        ax1.set_title('Initial Distribution Dataset')
 
         return fig, axes
 
     def draw_all(self):
         sf: list[SubFigure]
         fig = plt.figure(figsize=(8, 8), layout='constrained')
-        sf = fig.subfigures(2, 1)
-        ax0 = sf[0].subplots()
-        ax1, ax2 = sf[1].subplots(1, 2, sharex=True, sharey=True)
-        self.draw_proba_hist(ax0)
-        self.draw_dataset_scatter((ax1, ax2))
-        return fig, (ax0, ax1, ax2)
+        sf = fig.subfigures(2, 2)
+        ax0 = sf[0, 0].subplots()
+        ax1 = sf[0, 1].subplots()
+        bottom_sf = fig.subfigures(2, 1)[1]
+        ax2, ax3 = bottom_sf.subplots(1, 2, sharex=True, sharey=True)
+        self.draw_proba_hist(ax0, ax1)
+        self.draw_dataset_scatter((ax2, ax3))
+        return fig, (ax0, ax1, ax2, ax3)
 
     def animate_all(self, frames: int = 120, fps: int = 10, *, inplace: bool = False):
-        fig, (ax0, ax1, ax2) = self.draw_all()
+        fig, (ax0, ax1, ax2, ax3) = self.draw_all()
 
         # print("inplace: ",inplace)
         # model = self.model if inplace else deepcopy(self.model)
@@ -267,59 +460,128 @@ class Helper:
         # sample = self.sample
 
         def init():
-            return *ax0.patches, *ax1.collections, *ax2.collections
+            return *ax0.patches, *ax1.patches, *ax2.collections, *ax3.collections
 
         def func(frame):
-            fig.suptitle(f'No. {frame}', ha='left', x=0.01, size='small')
+            # PCA for training data
+            pca_train = PCA(2).fit(train.x)
+
+            # Separate PCA for test data
+            pca_test = PCA(2).fit(test.x)
+
+            fig.suptitle(f't = {frame}', ha='left', x=0.01, size='small')
 
             if frame == 0:
                 return ()
-            print(self.train.x.shape)
-            print(self.train.y.shape)
-            self.update(self.model, self.train, self.sample)
 
-            y = test.y.flatten()
+            # Update histograms for last_train (ax0)
+            # store the last training data here before update the train data in self.update()
+            self.last_train = makeDataset(self.train.x.clone(), self.train.y.clone())
+            # compute the probibility of last training data on last model before update
+            with pt.no_grad():
+                if(self.last_train is not None):
+                    y_prob_last: pt.Tensor = self.model(self.last_train.x)
+                    y_last = self.last_train.y.flatten()
+                    n_last = self.last_train.x.shape[0]
+                else:
+                    y_prob_last = None
 
-            n = test.x.shape[0]
-            m = n - pt.count_nonzero(y)
+            self.update(self.model, self.train, self.sample, self.recoursedFail, self.recoursedSuccess)
 
+            # Update histograms for last_train (ax0)
+            # here we handle the case that in first 2 rounds there is no recourse,
+            # so there is no modification on train data and model. We set last train data = current train data
+            with pt.no_grad():
+                if(self.last_train is None):
+                    y_prob_last: pt.Tensor = self.model(self.train.x)
+                    y_last = self.train.y.flatten()
+                    n_last = self.train.x.shape[0]     
+
+            y_prob_last = y_prob_last.flatten()
+            m_last = n_last - pt.count_nonzero(y_last)
+            rank_last = y_prob_last[y_last.argsort()]
+
+            # Update histogram for last train data (ax0)
+            for b, r in zip(self._hist_last, (rank_last[:m_last], rank_last[m_last:])):
+                height, _ = np.histogram(r, self._bins_last, range=(0, 1))
+                for rect, h in zip(b.patches, height * (100 / n_last)):
+                    rect.set_height(h)
+
+            # Update histograms for current train (ax1)
+            with pt.no_grad():
+                y_prob_current: pt.Tensor = self.model(self.train.x)
+
+            y_current = self.train.y.flatten()
+            y_prob_current = y_prob_current.flatten()
+            n_current = self.train.x.shape[0]
+            m_current = n_current - pt.count_nonzero(y_current)
+            rank_current = y_prob_current[y_current.argsort()]
+
+            # Update histogram for current train data (ax1)
+            for b, r in zip(self._hist_current, (rank_current[:m_current], rank_current[m_current:])):
+                height, _ = np.histogram(r, self._bins_current, range=(0, 1))
+                for rect, h in zip(b.patches, height * (100 / n_current)):
+                    rect.set_height(h)
+
+            # Use pca_train for training data
+            self._sc_train.set_offsets(pca_train.transform(train.x))
+            self._sc_train.set_array(train.y.flatten())
+
+            if(self.showRecoursedPoints):
+                if hasattr(self, 'recoursedFail') and len(self.recoursedFail) > 0:
+                    # Get the indexed array
+                    indexed_array = self.train.x[self.recoursedFail]
+                    
+                    # Check if the indexed array actually has samples
+                    if indexed_array.shape[0] > 0:
+                        self._sc_recourse_fail.set_offsets(pca_train.transform(indexed_array))
+                        
+                if hasattr(self, 'recoursedSuccess') and len(self.recoursedSuccess) > 0:
+                    # Get the indexed array
+                    indexed_array = self.train.x[self.recoursedSuccess]
+                    
+                    # Check if the indexed array actually has samples
+                    if indexed_array.shape[0] > 0:
+                        self._sc_recourse_success.set_offsets(pca_train.transform(indexed_array))
+
+            # calculate js divergence of pca training data
+            self.js_divergence(self._sc_train.get_offsets(), self._sc_train.get_array())
             with pt.no_grad():
                 y_prob: pt.Tensor = self.model(test.x)
 
             y_prob = y_prob.flatten()
             y_pred = y_prob.greater(0.5)
-            rank = y_prob[y.argsort()]
 
-            for b, r in zip(self._hist, (rank[:m], rank[m:])):
-                height, _ = np.histogram(r, self._bins)
-                for r, h in zip(b.patches, height * (100 / n)):
-                    r.set_height(h)
-
-            self._sc_train.set_offsets(pca.transform(train.x))
-            self._sc_train.set_array(train.y.flatten())
-
-            # calculate js divergence of pca training data
-            self.js_divergence(self._sc_train.get_offsets(), self._sc_train.get_array())
+            # Use pca_test for test data
+            self._sc_test.set_offsets(pca_test.transform(test.x))
             self._sc_test.set_array(y_pred)
 
-            ax1.relim()
-            ax1.autoscale_view()
+
+            ax2.relim()
+            ax2.autoscale_view()
+
+            ax3.relim()
+            ax3.autoscale_view()
 
             for c in self._ct_test.collections:
                 c.remove()
 
-            x0, x1 = ax1.get_xlim()
-            y0, y1 = ax1.get_ylim()
-            n = 32
-            xy = np.mgrid[x0: x1: n * 1j, y0: y1: n * 1j]
-            z = pca.inverse_transform(xy.reshape(2, n * n).T)
-            z = pt.tensor(z, dtype=pt.float)
-            with pt.no_grad():
-                z: pt.Tensor = self.model(z)
-            z = z.view(n, n)
+            for c in self._ct_train.collections:
+                c.remove()
 
-            self._ct_test: QuadContourSet = ax2.contourf(
-                *xy, z, 10,
+            # For training plot (ax2)
+            x0_train, x1_train = ax2.get_xlim()
+            y0_train, y1_train = ax2.get_ylim()
+            n = 32
+            xy_train = np.mgrid[x0_train: x1_train: n * 1j, y0_train: y1_train: n * 1j]
+            z_train = pca_train.inverse_transform(xy_train.reshape(2, n * n).T)
+            z_train = pt.tensor(z_train, dtype=pt.float)
+            with pt.no_grad():
+                z_train: pt.Tensor = self.model(z_train)
+            z_train = z_train.view(n, n)
+
+            self._ct_train: QuadContourSet = ax2.contourf(
+                *xy_train, z_train, 10,
                 cmap='RdYlBu_r',
                 vmin=0,
                 vmax=1,
@@ -327,7 +589,37 @@ class Helper:
                 zorder=0,
             )
 
-            return *ax0.patches, *ax1.collections, *ax2.collections
+            # For test plot (ax3)
+            x0_test, x1_test = ax3.get_xlim()
+            y0_test, y1_test = ax3.get_ylim()
+            xy_test = np.mgrid[x0_test: x1_test: n * 1j, y0_test: y1_test: n * 1j]
+            z_test = pca_test.inverse_transform(xy_test.reshape(2, n * n).T)
+            z_test = pt.tensor(z_test, dtype=pt.float)
+            with pt.no_grad():
+                z_test: pt.Tensor = self.model(z_test)
+            z_test = z_test.view(n, n)
+
+            self._ct_test: QuadContourSet = ax3.contourf(
+                *xy_test, z_test, 10,
+                cmap='RdYlBu_r',
+                vmin=0,
+                vmax=1,
+                alpha=0.9,
+                zorder=0,
+            )
+
+            n_recourse_success = len(self.recoursedSuccess) if hasattr(self, 'recoursedSuccess') else 0
+            n_recourse_fail = len(self.recoursedFail) if hasattr(self, 'recoursedFail') else 0
+            sc_train_labels = self._sc_train.get_array()  # this holds labels for plotted train points
+
+            # n_label_1 = np.sum(sc_train_labels == 1)
+            # n_label_0 = np.sum(sc_train_labels == 0)
+            # print("n_label_1: ",n_label_1)
+            # print("n_label_0: ",n_label_0)
+            # print("n_recourse_success: ",n_recourse_success)
+            # print("n_recourse_fail: ",n_recourse_fail)
+
+            return *ax0.patches, *ax1.patches, *ax2.collections, *ax3.collections
 
         return FuncAnimation(
             fig, func, frames, init,
@@ -365,7 +657,6 @@ class Helper:
         
     def draw_avgRecourseCostCompareToNormalModel(self):
         x = [20] * 20 + [40] * 20 + [60] * 20 + [80] * 19
-        print("self.avgRecourseCost_list : ",self.avgRecourseCost_list)
         df_recourseFailRate = pd.DataFrame({
             'rounds': x,
             'avgRecourseCost': self.avgRecourseCost_list,
@@ -376,12 +667,10 @@ class Helper:
             'avgRecourseCost': self.avgRecourseCostOnNormalModel_list,
             'model' : ['normal'] * 79
         })
-        # print("self.avgRecourseCost_list : ",self.avgRecourseCost_list)
         df_combined = pd.concat([df_recourseFailRate, df_recourseFailRateNormalModel], ignore_index=True)
         plt.figure()
         # sns.boxplot(x='rounds',y='EFPList',data = self.EFTdataframe)
         sns_plot = sns.boxplot(x = 'rounds',y = 'avgRecourseCost',hue= 'model',data = df_combined)
-        print("avgRecourseCost draw!")
         plt.savefig(os.path.join(self.save_directory, 'avgRecourseCostCompareToNormalModel.png'))
 
     def draw_failToRecourseCompareToNormalModel(self):
@@ -403,7 +692,6 @@ class Helper:
         plt.figure()
         # sns.boxplot(x='rounds',y='EFPList',data = self.EFTdataframe)
         sns_plot = sns.boxplot(x = 'rounds',y = 'failRate',hue= 'model',data = df_combined)
-        print("FailtoRecourse draw!")
         plt.savefig(os.path.join(self.save_directory, 'failToRecourseCompareToNormalModel.png'))
         # sns_plot = sns.boxplot(x = 'rounds',y = 'failRate',data = df_recourseFailRate)
         # fig = sns_plot.get_figure()
@@ -413,7 +701,6 @@ class Helper:
         data = []
         labels = [(epochs / 10 - 1) * (i+1) for i in range(10)]
         x = [1,2,3,4,5,6,7,8,9,10]
-        print("EFT labels: ",labels)
         # labels = [8 * (i+1) for i in range(12)]
         # x = [1,2,3,4,5,6,7,8,9,10,11,12]
         for i in range((int(epochs / 10)-1),int(labels[-1]) + 1,(int(epochs / 10) - 1)):
@@ -857,8 +1144,27 @@ class Helper:
             chosen.append(choose)
 
         return chosen
+    
+    def plot_model_shift_w_diff_cost(self):
+        plt.figure()
+        plt.plot(self.low_cost_model_shift_list)
+        plt.plot(self.high_cost_model_shift_list)
+        plt.legend(['low_cost_model_shift', 'high_cost_model_shift'])
+        plt.xlabel('Round')
+        plt.ylabel('model_shift_distance')
+        plt.title('model_shift_distance during Rounds')
+        plt.savefig(os.path.join(self.save_directory, 'model_shift_comp.png'))
 
-                    
+    
+    def plot_feature_ranking(self):
+        plt.figure()
+        plt.plot(self.important_feature_ranking)
+        plt.plot(self.low_cost_feature_ranking)
+        plt.legend(["important feature", "low cost feature"])
+        plt.xlabel('Round')
+        plt.ylabel('feature ranking')
+        plt.title('feature ranking during rounds')
+        plt.savefig(os.path.join(self.save_directory, 'feature ranking.png'))
             
                 
     

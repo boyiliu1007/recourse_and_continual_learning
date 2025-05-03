@@ -75,8 +75,8 @@ def training(model: nn.Module, dataset: Dataset, max_epochs: int,testDataset: Da
         #update learning rate according to val_loss
         scheduler.step(val_loss)
         
-        if ( ( (_+1) % 15 == 0) | (_ == 0) ) & printLoss == True:
-            print(f"Epoch {_+1}/{max_epochs}, Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, LR: {optimizer.param_groups[0]['lr']:.6f}")
+        # if ( ( (_+1) % 15 == 0) | (_ == 0) ) & printLoss == True:
+        #     print(f"Epoch {_+1}/{max_epochs}, Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, LR: {optimizer.param_groups[0]['lr']:.6f}")
     if loss_list is not None:
         loss_list.append(train_loss)
     if val_loss_list is not None:
