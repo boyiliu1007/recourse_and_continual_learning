@@ -18,32 +18,36 @@ class Recourse(nn.Module):
         return_act = a.clone().detach()
         return x, return_act
     
-def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.Tensor = None, loss_list: list = None,cost_list = None):
+def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.Tensor = None, loss_list: list = None,cost_list = None, target_x = None):
     loss: pt.Tensor
     r_model = Recourse(dataset.x.shape)
     optimizer = optim.SGD(r_model.parameters(), lr=0.5)
     pt.manual_seed(42)
-    cost_constant = pt.tensor([2, 2])
+    cost_constant = pt.tensor([0.1, 0.1])
     # normalize the cost constant and make it sum to 1
-    cost_constant = cost_constant / cost_constant.sum()
-
+    # cost_constant = cost_constant / cost_constant.sum()
     criterion = nn.BCELoss()
+    targetx_criterion = nn.MSELoss()
     r_model.train()
 
     for epoch in range(max_epochs):
         x_hat, return_act = r_model(dataset.x)
-        y_hat = c_model(x_hat)
-        
-        # relu loss version
-        # output_margin = y_hat - 0.7
-        # target_margin = pt.ones_like(y_hat) * 0.001  # push slightly over
-        # penalty_weight = 10
-        # margin_loss = (pt.relu(target_margin - output_margin)* penalty_weight).mean()
-        
-        # bce loss version
-        target = pt.ones_like(y_hat)
-        target *= 1
-        bce_loss = criterion(y_hat, target)
+        if target_x is not None: 
+            target_x = target_x.expand_as(x_hat)
+            bce_loss = targetx_criterion(x_hat, target_x)
+        else:
+            y_hat = c_model(x_hat)
+
+            # relu loss version
+            # output_margin = y_hat - 0.7
+            # target_margin = pt.ones_like(y_hat) * 0.001  # push slightly over
+            # penalty_weight = 10
+            # margin_loss = (pt.relu(target_margin - output_margin)* penalty_weight).mean()
+            
+            # bce loss version
+            target = pt.ones_like(y_hat)
+            target *= 1
+            bce_loss = criterion(y_hat, target)
         
         # action cost (here use squared error)
         action_cost = ((x_hat - dataset.x) ** 2).mean(0)

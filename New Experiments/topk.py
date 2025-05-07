@@ -34,7 +34,7 @@ DIRECTORY = os.path.join(current_directory, f"{current_file_name}_output")
 # modified parameters for observations
 THRESHOLD = 0.7           #0.5 0.7 0.9
 RECOURSENUM = 0.5          #0.2 0.5 0.7
-COSTWEIGHT = 'extreme2'     #uniform log extreme
+COSTWEIGHT = 'uniform'     #uniform log extreme extreme2
 DATASET = dataset
 
 try:
@@ -55,15 +55,10 @@ class Exp2(Helper):
         print("round: ",self.round)
         self.round += 1
 
-        # if self.round == 1:
-        #     with pt.no_grad():  # Disable gradient tracking
-        #         self.model.linear.weight.copy_(pt.full_like(self.model.linear.weight, 0.1))
-        #         self.model.linear.bias.copy_(pt.full_like(self.model.linear.bias, 0))
-        #     print("initial model params", self.model.state_dict())
-        #save model parameters
-        if(self.round == 2): # here round 2 is the first round of recourse since round 1 is the initial model
-            self.first_model_params = deepcopy(self.model_params)
-            print("first model params", self.first_model_params)
+
+        # if(self.round == 2): # here round 2 is the first round of recourse since round 1 is the initial model
+        #     self.first_model_params = deepcopy(self.model_params)
+        #     print("first model params", self.first_model_params)
         self.model_params = deepcopy(self.model.state_dict())
         
         if self.round != 1:
@@ -110,37 +105,11 @@ class Exp2(Helper):
             mask = pt.zeros_like(y_prob_all)
             mask[sorted_indices[:cutoff_index]] = 1
             self.train.y = mask.float().squeeze(1)
-
-            # feature importance
-            rf = RandomForestClassifier(n_estimators=100, random_state=42)
-            rf.fit(train.x, train.y.ravel())  # Make sure y is 1D
-
-            # Get feature importances
-            importances = rf.feature_importances_
-
-            ranked_features = np.argsort(-importances)
-            feature_to_rank = np.zeros_like(ranked_features)
-            for rank, feature_idx in enumerate(ranked_features):
-                feature_to_rank[feature_idx] = rank
-
-            # Now sum up the ranks of dimensions 0 ~ 5
-            # feature_rank_sum = 0
-            # for feature_idx in range(0, 5):  # feature 0, 1, 2, 3, 4, 5
-            #     feature_rank_sum += feature_to_rank[feature_idx]
-            # print("feature rank sum", feature_rank_sum/5)
-            # self.low_cost_feature_ranking.append(feature_rank_sum/5)
-            important_feature_rank_sum = 0
-            important_feature_rank_sum += feature_to_rank[16]+feature_to_rank[18]+feature_to_rank[7]+feature_to_rank[13]
-            important_feature_rank_sum /= 4
-            print("important feature rank sum", important_feature_rank_sum)
-            self.important_feature_ranking.append(important_feature_rank_sum)
             
-            # print the sum of train.x feature wise
-            print("sum of train.x feature wise", pt.sum(self.train.x, dim=0))
 
             # train the model with the updated dataset
             training(self.model, self.train, 50, self.test,loss_list=self.RegreesionModelLossList,val_loss_list=self.RegreesionModel_valLossList,printLoss=True)
-            print("Classifier weights:", self.model.linear.weight.data)
+            
         #calculate metrics: ========================================================================
 
         #calculate short term accuracy
@@ -205,48 +174,20 @@ class Exp2(Helper):
         self.model_shift_distance_list.append(shift_distance)
 
         
-        #calculate cosine similarity
-        cosine_similarity = sum(
-            pt.nn.functional.cosine_similarity(
-                last_model_params[key].view(-1),
-                current_model_params[key].view(-1),
-                dim=0  # make sure to compare full vectors
-            )
-            for key in last_model_params.keys() if 'weight' in key
-        )
-        # print("last model with current model cosine", cosine_similarity.item())
+        # calculate average entropy of the model
+        with pt.no_grad():
+            y_prob: pt.Tensor = self.model(self.train.x)
+        y_prob = y_prob.squeeze(1)
+        y_prob = pt.clamp(y_prob, min=1e-7, max=1 - 1e-7)  # Avoid log(0)
+        entropy = -pt.mean(y_prob * pt.log(y_prob) + (1 - y_prob) * pt.log(1 - y_prob))
+        self.entropy_list.append(entropy.item())
 
-        if (self.first_model_params != None):
-            cosine_similarity = sum(
-                pt.nn.functional.cosine_similarity(
-                    self.first_model_params[key].view(-1),
-                    current_model_params[key].view(-1),
-                    dim=0  # make sure to compare full vectors
-                )
-                for key in last_model_params.keys() if 'weight' in key
-            )
-            # print("first model with current model cosine", cosine_similarity.item())
 
-        # calculate model shift on each feature
-        model_shift_per_feature = {}
-        for key in last_model_params.keys():
-            if 'weight' in key:
-                diff = last_model_params[key] - current_model_params[key]  
-                shift_per_feature = pt.norm(diff, p=2, dim=0) 
-                model_shift_per_feature[key] = shift_per_feature.tolist()
-
-        # print("Model shift per feature:", model_shift_per_feature)
-        low_cost_model_shift = abs(model_shift_per_feature['linear.weight'][0]) + abs(model_shift_per_feature['linear.weight'][1]) + abs(model_shift_per_feature['linear.weight'][2]) + abs(model_shift_per_feature['linear.weight'][3]) + abs(model_shift_per_feature['linear.weight'][4])
-        low_cost_model_shift /= 5
-        high_cost_model_shift = 0
-        for i in range(5, len(model_shift_per_feature['linear.weight'])):
-            high_cost_model_shift += abs(model_shift_per_feature['linear.weight'][i])
-        high_cost_model_shift /= len(model_shift_per_feature['linear.weight']) - 5
-
-        # print("low avg cost shift", low_cost_model_shift)
-        # print("high avg cost shift", high_cost_model_shift)
-        self.low_cost_model_shift_list.append(low_cost_model_shift)
-        self.high_cost_model_shift_list.append(high_cost_model_shift)
+        # calculate average score before sigmoid
+        score = self.test.x @ self.model.linear.weight.T + self.model.linear.bias
+        avg_score = score.mean()
+        self.avg_score_list.append(avg_score.item())
+        print("====================================================")
 
 
 exp2 = Exp2(model, pca, train, test, sample)
@@ -266,14 +207,12 @@ exp2.plot_model_shift_w_diff_cost()
 exp2.plot_feature_ranking()
 
 # save to csv
-# FileSaver(exp2.failToRecourse, 
-#           exp2.overall_acc_list, 
-#           exp2.jsd_list, 
-#           exp2.avgRecourseCost_list, 
-#           exp2.avgNewRecourseCostList, 
-#           exp2.avgOriginalRecourseCostList,
-#           exp2.t_rate_list,
-#           exp2.model_shift_distance_list,
-#           exp2.failToRecourse_old,
-#           exp2.failToRecourse_new
-#         ).save_to_csv(RECOURSENUM, THRESHOLD, POSITIVE_RATIO, COSTWEIGHT, DATASET, current_time, DIRECTORY)
+FileSaver(exp2.failToRecourse, 
+          exp2.overall_acc_list, 
+          exp2.jsd_list, 
+        #   exp2.avgRecourseCost_list, 
+          exp2.t_rate_list,
+          exp2.model_shift_distance_list,
+          exp2.entropy_list,
+          exp2.avg_score_list
+        ).save_to_csv(RECOURSENUM, THRESHOLD, POSITIVE_RATIO, COSTWEIGHT, DATASET, current_time, DIRECTORY)

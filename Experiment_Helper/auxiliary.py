@@ -95,17 +95,15 @@ def update_train_data(train, sample, model, type = 'all', expected_size = None):
     print(f"Number of 1s: {num_ones}")
 
 class FileSaver:
-    def __init__(self, fail_to_recourse, overall_acc_list, jsd_list, avgRecourseCost, avgNewRecourseCost, avgOriginalRecourseCost, t_rate_list, model_shift_list, fail_to_recourse_old = [], fail_to_recourse_new = []):
+    def __init__(self, fail_to_recourse, overall_acc_list, jsd_list, t_rate_list, model_shift_list, entropy_list, avg_score_list):
         self.failToRecourse = fail_to_recourse
         self.overall_acc_list = overall_acc_list
         self.jsd_list = jsd_list
-        self.avgRecourseCost = avgRecourseCost
-        self.avgNewRecourseCost = avgNewRecourseCost
-        self.avgOriginalRecourseCost = avgOriginalRecourseCost
+        # self.avgRecourseCost = avgRecourseCost
         self.t_rate_list = t_rate_list
         self.model_shift_list = model_shift_list
-        self.failToRecourse_old = fail_to_recourse_old
-        self.failToRecourse_new = fail_to_recourse_new
+        self.entropy_list = entropy_list
+        self.avg_score_list = avg_score_list
 
     def save_to_csv(self, recourse_num, threshold, acceptance_rate, cost_weight, dataset, current_time, directory = ''):
         filename = f"{recourse_num}_{threshold}_{acceptance_rate}_{cost_weight}_{dataset}_{current_time}.csv"
@@ -114,20 +112,22 @@ class FileSaver:
             filename = directory + filename
 
 
-        self.avgRecourseCost.insert(0, 0)
-        self.avgNewRecourseCost.insert(0, 0)
-        self.avgOriginalRecourseCost.insert(0, 0)
+        # self.avgRecourseCost.insert(0, 0)
+        # self.avgNewRecourseCost.insert(0, 0)
+        # self.avgOriginalRecourseCost.insert(0, 0)
 
         print(len(self.failToRecourse))
         print(len(self.overall_acc_list))
         print(len(self.jsd_list))
-        print(len(self.avgRecourseCost))
-        print(len(self.avgNewRecourseCost))
-        print(len(self.avgOriginalRecourseCost))
+        # print(len(self.avgRecourseCost))
+        # print(len(self.avgNewRecourseCost))
+        # print(len(self.avgOriginalRecourseCost))
         print(len(self.t_rate_list))
         print(len(self.model_shift_list))
-        print(len(self.failToRecourse_old))
-        print(len(self.failToRecourse_new))
+        # print(len(self.failToRecourse_old))
+        # print(len(self.failToRecourse_new))
+        print(len(self.entropy_list))
+        print(len(self.avg_score_list))
 
         # since short term accuracy cannot calculate the first 2 element so insert two 0s here
         
@@ -136,13 +136,15 @@ class FileSaver:
             'failToRecourse': self.failToRecourse,
             'acc': self.overall_acc_list,
             'jsd': self.jsd_list,
-            'avgRecourseCost': self.avgRecourseCost,
-            'avgNewRecourseCost': self.avgNewRecourseCost,
-            'avgOriginalRecourseCost': self.avgOriginalRecourseCost,
+            # 'avgRecourseCost': self.avgRecourseCost,
+            # 'avgNewRecourseCost': self.avgNewRecourseCost,
+            # 'avgOriginalRecourseCost': self.avgOriginalRecourseCost,
             't_rate': self.t_rate_list,
             'model_shift': self.model_shift_list,
-            'failToRecourse_old': self.failToRecourse_old,
-            'failToRecourse_new': self.failToRecourse_new
+            # 'failToRecourse_old': self.failToRecourse_old,
+            # 'failToRecourse_new': self.failToRecourse_new
+            'entropy': self.entropy_list,
+            'avg_score': self.avg_score_list
         }
         for key in data.keys():
             print(f"{key}: {len(data[key])}")

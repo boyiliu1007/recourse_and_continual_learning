@@ -113,6 +113,8 @@ class Helper:
         self.high_cost_model_shift_list = []
         self.low_cost_feature_ranking = []
         self.important_feature_ranking = []
+        self.entropy_list = []
+        self.avg_score_list = []
 
     # def draw_proba_hist(self, ax: Axes | None = None, *, label: bool = False):
     def draw_proba_hist(self, ax0: Axes = None, ax1: Axes = None, *, label: bool = False):

@@ -39,20 +39,21 @@ def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.T
         # bceloss = criterion(y_hat, threshold_v)
         
         # relu loss version
-        output_margin = y_hat - 0.7
-        target_margin = pt.ones_like(y_hat) * 0.001  # push slightly over
-        penalty_weight = 10
-        margin_loss = (pt.relu(target_margin - output_margin)* penalty_weight).mean()
+        # output_margin = y_hat - threshold
+        # target_margin = pt.ones_like(y_hat) * 0.001  # push slightly over
+        # penalty_weight = 10
+        # margin_loss = (pt.relu(target_margin - output_margin)* penalty_weight).mean()
         
         # bce loss version
         target = pt.ones_like(y_hat)          
-        target *= 0.7
+        target *= threshold
         bce_loss = criterion(y_hat, target)
         weight = weight / weight.sum()
         
         # action cost (here use squared error)
-        action_cost = ((x_hat - dataset.x) ** 2).mean(0)
+        action_cost = (x_hat - dataset.x) ** 2
         weighted_action_cost = (weight * action_cost).sum()
+
         
         # final loss function
         loss = bce_loss + 0.001 * weighted_action_cost
@@ -68,6 +69,6 @@ def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.T
     dataset.x = x_hat.detach() 
     dataset.y = (c_model(dataset.x) > 0.5).float()
     score = c_model(dataset.x)
-    # print("score",score.squeeze())
+    print("score",score.squeeze())
 
     return dataset, return_act.detach()

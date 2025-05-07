@@ -4,6 +4,7 @@ import torch as pt
 import math
 import os
 import pandas as pd
+import numpy as np
 import datetime
 from sklearn.datasets import make_classification
 os.makedirs("Pure Recourse Experiment/Results", exist_ok=True)
@@ -36,22 +37,35 @@ POSITIVE_RATIO = 0.5
 # x_full = pt.cat([x, x_sym], dim=0)
 # y_full = pt.cat([pt.zeros(num_points), pt.ones(num_points)])
 
-sqrt3 = pt.sqrt(pt.tensor(3.0))
-R = pt.tensor([
-    [-0.5, sqrt3 / 2],
-    [sqrt3 / 2, 0.5]
-])
+# sqrt3 = pt.sqrt(pt.tensor(3.0))
+# R = pt.tensor([
+#     [-0.5, sqrt3 / 2],
+#     [sqrt3 / 2, 0.5]
+# ])
 
 # Step 1: Random 2D points
-num_points = 100
-x = pt.randn(num_points, 2)
+# num_points = 100
+# x = pt.randn(num_points, 2)
 
-# Step 2: Reflect across y = 2x
-x_reflected = x_reflected = x @ R.T
+# # Step 2: Reflect across y = 2x
+# x_reflected = x @ R.T
 
-# Step 3: Combine original + reflected
-x_full = pt.cat([x, x_reflected])
-y_full = pt.cat([pt.zeros(num_points), pt.ones(num_points)])
+# # Step 3: Combine original + reflected
+# x_full = pt.cat([x, x_reflected])
+# y_full = pt.cat([pt.zeros(num_points), pt.ones(num_points)])
+
+num_points = 64
+t = pt.linspace(-5, 5, num_points)
+x0 = pt.stack([t, t - 1], dim=1)
+R = pt.tensor([
+    [0.0, 1.0],
+    [1.0, 0.0]
+])
+x1 = x0 @ R.T
+
+# Combine
+x_full = pt.cat([x0, x1], dim=0)
+y_full = pt.cat([pt.zeros(num_points), pt.ones(num_points)], dim=0)
 
 train = Dataset(x_full, y_full)
 model = LogisticRegression(train.x.shape[1], 1)
@@ -60,7 +74,7 @@ model = LogisticRegression(train.x.shape[1], 1)
 loss_list = []
 # model = training(model, train, 200, loss_list)
 # random state = 43
-model.linear.weight.data[0][0] = -1.732
+model.linear.weight.data[0][0] = -1
 model.linear.weight.data[0][1] = 1
 model.linear.bias.data[0] = 0
 y_pred = model(train.x).detach().squeeze()
@@ -83,7 +97,7 @@ cosine_list = []
 plot_decision_boundary(model, train, "Pure Recourse Experiment/Results/recourse_round_0.png", 0)
 print("model weight:", model.linear.weight.data) # debug log
 print("model bias:", model.linear.bias.data) # debug log
-for i in range(10):
+for i in range(2):
     print(f"round: {i+1}")
     # norm 
     # train.x = (train.x - train.x.mean(0)) / train.x.std(0)
@@ -96,17 +110,40 @@ for i in range(10):
     # find training data with label 0 and select 0.5 of them
     data, labels = train.x, train.y
     label_0_indices = pt.where(labels == 0)[0]
-    shuffled_indices = pt.randperm(len(label_0_indices))
-    label_0_indices = label_0_indices[shuffled_indices]
-    num_samples = math.floor(len(label_0_indices) * 0.5)
-    selected_indices = label_0_indices[:num_samples]
-    print(f"{num_samples} in train data do recourse")
+    # shuffled_indices = pt.randperm(len(label_0_indices))
+    # label_0_indices = label_0_indices[shuffled_indices]
+    num_samples = math.floor(len(label_0_indices) * 0.1)
+    even_indices = pt.linspace(0, len(label_0_indices) - 1, num_samples).long()
+    # random_index = label_0_indices[np.random.choice(len(label_0_indices))]
+    # selected_indices = label_0_indices[random_index].unsqueeze(0)
+    selected_indices = label_0_indices[even_indices]
+    
+    print(labels[selected_indices])
+    print("1 in train data do recourse")
 
     selected_subset = Dataset(data[selected_indices], labels[selected_indices].unsqueeze(1))
 
+    # this part is for recoruse target 
+    label_1_indices = pt.where(labels == 1)[0]
+    label_1_data = data[label_1_indices]
+    model.eval()
+    with pt.no_grad():
+        scores = model(label_1_data).squeeze() 
+
+    mask = scores > 0.6
+    valid_scores = scores[mask]
+    valid_indices = label_1_indices[mask]
+
+    if len(valid_scores) == 0:
+        print("No label=1 points with score > 0.6 found.")
+    else:
+        score_diffs = (valid_scores - 0.6).abs()
+        closest_idx = pt.argmin(score_diffs)
+        selected_index = valid_indices[closest_idx]
+
     # update train data with recoursed data
-    recoursed_data, act = recourse(model, selected_subset, 200)
-    # print("act", act)
+    recoursed_data, act = recourse(model, selected_subset, 200, target_x=train.x[selected_index].unsqueeze(0))
+    print("act", act)
     train.x[selected_indices] = recoursed_data.x.detach()
     train.y[selected_indices] = recoursed_data.y.detach()
     
@@ -116,13 +153,13 @@ for i in range(10):
 
 
     # topk method
-    with pt.no_grad():
-        y_prob_all: pt.Tensor = model(train.x)
-    sorted_indices = pt.argsort(y_prob_all, dim=0, descending=True)
-    cutoff_index = int(len(sorted_indices) * POSITIVE_RATIO)
-    mask = pt.zeros_like(train.y)
-    mask[sorted_indices[:cutoff_index].squeeze()] = 1
-    train.y = mask.float()
+    # with pt.no_grad():
+    #     y_prob_all: pt.Tensor = model(train.x)
+    # sorted_indices = pt.argsort(y_prob_all, dim=0, descending=True)
+    # cutoff_index = int(len(sorted_indices) * POSITIVE_RATIO)
+    # mask = pt.zeros_like(train.y)
+    # mask[sorted_indices[:cutoff_index].squeeze()] = 1
+    # train.y = mask.float()
 
     prev_model = model.linear.weight.data.clone()
     

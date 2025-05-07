@@ -14,7 +14,7 @@ from Dataset.makeDataset import Dataset
 from Model.Recourse import recourse
 from Test.test_recourse_only_modify_selected import test_only_selected_data_modified
 from Auxiliary.plot_decision_boundary import plot_decision_boundary_pca, plot_decision_boundary_tsne, plot_decision_boundary_umap, plot_decision_boundary
-
+from Model.SI import SynapticIntelligence, continual_training
 
 # generate dataset
 DIMENSIONS = 2
@@ -68,17 +68,18 @@ x_full = pt.cat([x0, x1], dim=0)
 y_full = pt.cat([pt.zeros(num_points), pt.ones(num_points)], dim=0)
 
 train = Dataset(x_full, y_full)
-model = LogisticRegression(train.x.shape[1], 1)
+m = LogisticRegression(train.x.shape[1], 1)
+si = SynapticIntelligence(m)
 
 
 # initial model
 loss_list = []
 # model = training(model, train, 200, loss_list)
 # random state = 43
-model.linear.weight.data[0][0] = -1
-model.linear.weight.data[0][1] = 1
-model.linear.bias.data[0] = 0
-y_pred = model(train.x).detach().squeeze()
+si.model.linear.weight.data[0][0] = -1
+si.model.linear.weight.data[0][1] = 1
+si.model.linear.bias.data[0] = 0
+y_pred = si.model(train.x).detach().squeeze()
 train.y = pt.where(y_pred > 0.5, 1, 0).float()
 
 # random state = 47
@@ -95,9 +96,9 @@ cosine_list = []
 # plot_decision_boundary_pca(model, train, "Pure Recourse Experiment/Results/recourse_round_0.png", DIMENSIONS)
 # plot_decision_boundary_umap(train, "Pure Recourse Experiment/Results/recourse_round_0_umap.png", DIMENSIONS)
 # plot_decision_boundary_tsne(model, train, "Pure Recourse Experiment/Results/recourse_round_0_tsne.png")
-plot_decision_boundary(model, train, "Pure Recourse Experiment/Results/recourse_round_0.png", 0)
-print("model weight:", model.linear.weight.data) # debug log
-print("model bias:", model.linear.bias.data) # debug log
+plot_decision_boundary(si.model, train, "Pure Recourse Experiment/Results/recourse_round_0.png", 0)
+print("model weight:", si.model.linear.weight.data) # debug log
+print("model bias:", si.model.linear.bias.data) # debug log
 for i in range(10):
     print(f"round: {i+1}")
     # norm 
@@ -109,6 +110,15 @@ for i in range(10):
     )
 
     # find training data with label 0 and select 0.5 of them
+    # data, labels = train.x, train.y
+    # label_0_indices = pt.where(labels == 0)[0]
+    # shuffled_indices = pt.randperm(len(label_0_indices))
+    # label_0_indices = label_0_indices[shuffled_indices]
+    # num_samples = math.floor(len(label_0_indices) * 0.2)
+    # # even_indices = pt.linspace(0, len(label_0_indices) - 1, num_samples).long()
+    # # random_index = label_0_indices[np.random.choice(len(label_0_indices))]
+    # # selected_indices = label_0_indices[random_index].unsqueeze(0)
+    # selected_indices = label_0_indices[:num_samples]
     data, labels = train.x, train.y
     label_0_indices = pt.where(labels == 0)[0]
     # shuffled_indices = pt.randperm(len(label_0_indices))
@@ -124,50 +134,50 @@ for i in range(10):
     selected_subset = Dataset(data[selected_indices], labels[selected_indices].unsqueeze(1))
 
     # update train data with recoursed data
-    recoursed_data, act = recourse(model, selected_subset, 200)
+    recoursed_data, act = recourse(si.model, selected_subset, 200)
     print("act", act)
     train.x[selected_indices] = recoursed_data.x.detach()
     train.y[selected_indices] = recoursed_data.y.detach()
     
     # test recourse function
-    if test_only_selected_data_modified(model, before_recoursed, train, selected_indices) != True:
+    if test_only_selected_data_modified(si.model, before_recoursed, train, selected_indices) != True:
         print("test error")
 
 
     # topk method
     with pt.no_grad():
-        y_prob_all: pt.Tensor = model(train.x)
+        y_prob_all: pt.Tensor = si.model(train.x)
     sorted_indices = pt.argsort(y_prob_all, dim=0, descending=True)
     cutoff_index = int(len(sorted_indices) * POSITIVE_RATIO)
     mask = pt.zeros_like(train.y)
     mask[sorted_indices[:cutoff_index].squeeze()] = 1
     train.y = mask.float()
 
-    prev_model = model.linear.weight.data.clone()
+    prev_model = si.model.linear.weight.data.clone()
     
     # update model
-    model = training(model, train, 200, loss_list)
+    continual_training(si, train, 200, loss_list)
 
-    weight = model.linear.weight.data[0]
-    bias = model.linear.bias.data.item()
+    weight = si.model.linear.weight.data[0]
+    bias = si.model.linear.bias.data.item()
     bias_list.append(bias)
     slope = -weight[0].item() / weight[1].item()
     print(f"Decision boundary slope: {slope:.4f}")
     # calculate cosine similarity between the two weight vectors
-    cosine_similarity = pt.nn.functional.cosine_similarity(prev_model, model.linear.weight.data[0])
+    cosine_similarity = pt.nn.functional.cosine_similarity(prev_model, si.model.linear.weight.data[0])
     cosine_list.append(cosine_similarity.item())
     print(f"Cosine similarity: {cosine_similarity.item():.4f}")
-    print("model weight:", model.linear.weight.data) # debug log
+    print("model weight:", si.model.linear.weight.data) # debug log
     # print(model.linear.bias.data)
-    print("model shift on low cost", pt.abs(model.linear.weight.data[0][0] - prev_model[0][0]).item())
-    print("model shift on high cost", pt.abs(model.linear.weight.data[0][1] - prev_model[0][1]).item())
-    low_cost_model_shift += pt.abs(model.linear.weight.data[0][0] - prev_model[0][0]).item()
-    high_cost_model_shift += pt.abs(model.linear.weight.data[0][1] - prev_model[0][1]).item()
+    print("model shift on low cost", pt.abs(si.model.linear.weight.data[0][0] - prev_model[0][0]).item())
+    print("model shift on high cost", pt.abs(si.model.linear.weight.data[0][1] - prev_model[0][1]).item())
+    low_cost_model_shift += pt.abs(si.model.linear.weight.data[0][0] - prev_model[0][0]).item()
+    high_cost_model_shift += pt.abs(si.model.linear.weight.data[0][1] - prev_model[0][1]).item()
     plot_path = f"Pure Recourse Experiment/Results/recourse_round_{i+1}.png"
     # plot_decision_boundary_umap(train, plot_path, DIMENSIONS)
     # plot_decision_boundary_pca(model, train, plot_path, DIMENSIONS)
     # plot_decision_boundary_tsne(model, train, plot_path)
-    plot_decision_boundary(model, train, plot_path, i)
+    plot_decision_boundary(si.model, train, plot_path, i)
     print("====================================")
 
 print("overall low cost model shift", low_cost_model_shift)
