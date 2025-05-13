@@ -125,8 +125,8 @@ def continual_training(si: SynapticIntelligence, dataset: Dataset, max_epochs: i
         train_loss = running_loss / len(train_loader.dataset)
         epoch_loss.append(train_loss)
 
-        if ((_+1) % 15 == 0) or (_ == 0):
-            print(f"Epoch {_+1}/{max_epochs}, Loss: {train_loss:.4f}, LR: {optimizer.param_groups[0]['lr']:.6f}")
+        if(_ == max_epochs - 1):
+            print(f"Model Loss: {train_loss:.4f}")
     
     # After task training is complete, consolidate knowledge
     si.consolidate()

@@ -15,7 +15,7 @@ from Experiment_Helper.auxiliary import getWeights, update_train_data, FileSaver
 
 from Models.logisticRegression import LogisticRegression, training
 from Models.synapticIntelligence import continual_training
-from Models.recourseGradient import recourse
+from Models.recourseGradient_simple import recourse
 from Config.continual_MLP_config import train, test, sample, si, dataset, POSITIVE_RATIO # modified parameters for observations
 from Dataset.makeDataset import Dataset
 
@@ -33,8 +33,8 @@ except Exception as e:
     print(f"An error occurred: {e}")
 
 # modified parameters for observations
-THRESHOLD = 0.9            #0.5 0.7 0.9
-RECOURSENUM = 0.7          #0.2 0.5 0.7
+THRESHOLD = 0.7            #0.5 0.7 0.9
+RECOURSENUM = 0.5          #0.2 0.5 0.7
 COSTWEIGHT = 'uniform'     #uniform log
 DATASET = dataset
 
@@ -45,7 +45,7 @@ class Exp3(Helper):
     3. continual training the model with the updated dataset
     '''
 
-    def update(self, model: nn.Module, train: Dataset, sample: Dataset):
+    def update(self, model: nn.Module, train: Dataset, sample: Dataset, recoursedFail, recoursedSuccess):
         print("round: ",self.round)
         self.round += 1
 
@@ -67,7 +67,7 @@ class Exp3(Helper):
             selected_subset = Dataset(data[selected_indices], labels[selected_indices].unsqueeze(1))
             recourse_weight = getWeights(self.train.x.shape[1], COSTWEIGHT)
             
-            recourse(
+            recoursed, action = recourse(
                 self.model,
                 selected_subset,
                 100,
@@ -77,13 +77,14 @@ class Exp3(Helper):
                 cost_list=self.avgRecourseCost_list,
                 q3RecourseCost=self.q3RecourseCost,
                 recourseModelLossList=self.recourseModelLossList,
-                isNew = isNewList[selected_indices],
+                isNew = pt.tensor([]) if isNewList.numel() == 0 else isNewList[selected_indices],
                 new_cost_list=self.avgNewRecourseCostList,
                 original_cost_list=self.avgOriginalRecourseCostList
             )
-            
-            recoursed_data = selected_subset.x
+            # print("recourse action", action)
+            recoursed_data = recoursed.x
             self.train.x[selected_indices] = recoursed_data
+            
 
 
             # update the labels of D using diversek method
@@ -130,19 +131,13 @@ class Exp3(Helper):
 
             # train the model with the updated dataset
             if(self.jsd_list == []):
-                continual_training(self.si, self.train, 50, lambda_ = 0)
+                continual_training(self.si, self.train, 10, lambda_ = 0, observe_range=3)
             else:
-                continual_training(self.si, self.train, 50, lambda_ = 0.0000001/(self.jsd_list[-1]))
+                continual_training(self.si, self.train, 10, lambda_ = 0.00001/(self.jsd_list[-1]), observe_range=7)
 
-            self.si.update_omega(self.train, nn.BCELoss())
-            self.si.consolidate(3)
 
         #calculate metrics: ========================================================================
-        #calculate short term accuracy
-        current_data = Dataset(self.train.x, self.train.y)
-        self.historyTrainList.append(current_data)
-        self.overall_acc_list.append(self.calculate_AA(self.model, self.historyTrainList, 7))
-        
+
         if self.round != 1:
             #add back the unselected positive data in original order
             # Create a new tensor with the correct shape
@@ -156,29 +151,86 @@ class Exp3(Helper):
             self.train.x = new_x
             self.train.y = new_y
 
+        #calculate higher standard (model output before sigmoid) based on last train data
+        if self.historyTrainList != []:
+            last_data = self.historyTrainList[-1]
+            last_data.x = self.train.x
+
+            # Forward pass through layers up to the final linear layer
+            hidden1 = pt.relu(self.model.layers[0](last_data.x))
+            hidden2 = pt.relu(self.model.layers[2](hidden1))
+            final_score2 = self.model.layers[4](hidden2)  # raw score before Sigmoid
+            avg_score2 = final_score2.mean()
+
+            # Manually compute the same thing using self.model_params
+            w1 = self.model_params['layers.0.weight']
+            b1 = self.model_params['layers.0.bias']
+            w2 = self.model_params['layers.2.weight']
+            b2 = self.model_params['layers.2.bias']
+            w3 = self.model_params['layers.4.weight']
+            b3 = self.model_params['layers.4.bias']
+
+            h1 = pt.relu(last_data.x @ w1.T + b1)
+            h2 = pt.relu(h1 @ w2.T + b2)
+            final_score1 = h2 @ w3.T + b3
+            avg_score1 = final_score1.mean()
+
+            self.avg_score_on_last_train.append(avg_score1.item() - avg_score2.item())
+        else:
+            self.avg_score_on_last_train.append(0)
+            
+        #calculate short term accuracy
+        current_data = Dataset(self.train.x, self.train.y)
+        self.historyTrainList.append(current_data)
+        with pt.no_grad():
+            y_prob_test: pt.Tensor = self.model(self.test.x)
+        y_prob_test = y_prob_test.squeeze(1)
+        y_pred_test = (y_prob_test > 0.5).float()
+        self.test.y = y_pred_test
+        current_test = Dataset(self.test.x, self.test.y)
+        self.historyTestList.append(current_test)
+        self.overall_acc_list.append(self.calculate_AA(self.model, self.historyTestList, 7))
+        
+        if self.round == 1:
+            self.historyTrainList_withoutRecourse.append(current_data)
+            self.overall_acc_list_withoutRecourse.append(self.calculate_AA(self.model, self.historyTrainList_withoutRecourse, 7))
+
         if self.round != 1:
+
+            # calculate short term accuracy without recourse
+            mask = pt.ones(self.train.x.size(0), dtype=bool)
+            mask[selected_indices] = False  # Mask out the selected indices
+            current_data_without_recourse = Dataset(self.train.x[mask], self.train.y[mask])
+            self.historyTrainList_withoutRecourse.append(current_data_without_recourse)
+            self.overall_acc_list_withoutRecourse.append(self.calculate_AA(self.model, self.historyTrainList_withoutRecourse, 7))
+
             #calculate ftr
-            recourseFailCnt = pt.where(self.train.y[selected_indices] == 0)[0].shape[0]
+            fail_positions = pt.where(self.train.y[selected_indices] == 0)[0]
+            success_positions = pt.where(self.train.y[selected_indices] == 1)[0]
+            self.recoursedFail = selected_indices[fail_positions]
+            self.recoursedSuccess = selected_indices[success_positions]
+            recourseFailCnt = fail_positions.shape[0] if fail_positions.shape[0] > 0 else 0
             recourseFailRate = recourseFailCnt / len(self.train.y[selected_indices])
             self.failToRecourse.append(recourseFailRate)
-            print("recourseFailRate: ",recourseFailRate)
 
-            #calculate ftr_old
-            new_indices = isNewList[selected_indices]
-            old_selected_indices = selected_indices[new_indices == False]
-            # print(f"old_selected_indices: {len(old_selected_indices)}")
-            recourseFailCnt_old = pt.where(self.train.y[old_selected_indices] == 0)[0].shape[0]
-            recourseFailRate_old = recourseFailCnt_old / len(self.train.y[old_selected_indices])
-            self.failToRecourse_old.append(recourseFailRate_old)
-            print("recourseFailRate_old: ",recourseFailRate_old)
-            
-            #calculate ftr_new
-            new_selected_indices = selected_indices[new_indices == True]
-            # print(f"new_selected_indices: {len(new_selected_indices)}")
-            recourseFailCnt_new = pt.where(self.train.y[new_selected_indices] == 0)[0].shape[0]
-            recourseFailRate_new = recourseFailCnt_new / len(self.train.y[new_selected_indices])
-            self.failToRecourse_new.append(recourseFailRate_new)
-            print("recourseFailRate_new: ",recourseFailRate_new)
+            if isNewList.numel() != 0:
+                #calculate ftr_old
+                new_indices = isNewList[selected_indices]
+                old_selected_indices = selected_indices[new_indices == False]
+                recourseFailCnt_old = pt.where(self.train.y[old_selected_indices] == 0)[0].shape[0]
+                recourseFailRate_old = recourseFailCnt_old / len(self.train.y[old_selected_indices])
+                self.failToRecourse_old.append(recourseFailRate_old)
+                
+                #calculate ftr_new
+                new_selected_indices = selected_indices[new_indices == True]
+                # print(f"new_selected_indices: {len(new_selected_indices)}")
+                recourseFailCnt_new = pt.where(self.train.y[new_selected_indices] == 0)[0].shape[0]
+                recourseFailRate_new = recourseFailCnt_new / len(self.train.y[new_selected_indices])
+                self.failToRecourse_new.append(recourseFailRate_new)
+                
+            else:
+                self.failToRecourse_old.append(0)
+                self.failToRecourse_new.append(0)
 
         else:
             self.failToRecourse.append(0)
@@ -206,12 +258,27 @@ class Exp3(Helper):
                 for key in last_model_params.keys()]), p=2
         )
         self.model_shift_distance_list.append(shift_distance)
+        
+        # calculate average entropy of the model
+        with pt.no_grad():
+            y_prob: pt.Tensor = self.model(self.train.x)
+        y_prob = y_prob.squeeze(1)
+        y_prob = pt.clamp(y_prob, min=1e-7, max=1 - 1e-7)  # Avoid log(0)
+        entropy = -pt.mean(y_prob * pt.log(y_prob) + (1 - y_prob) * pt.log(1 - y_prob))
+        self.entropy_list.append(entropy.item())
+
+        # calculate average score before sigmoid
+        with pt.no_grad():
+            x = self.test.x
+            x = pt.relu(self.model.layers[0](x))      # First Linear + ReLU
+            x = pt.relu(self.model.layers[2](x))      # Second Linear + ReLU
+            score = self.model.layers[4](x)              # Final Linear (before Sigmoid)
+            avg_score = score.mean()
+            self.avg_score_list.append(avg_score.item())
+
+        print("====================================================")
         #===========================================================================================
         
-        if self.round != 1:
-            self.train.x = self.train.x[keep_indices]
-            self.train.y = self.train.y[keep_indices]
-
 
 
 
@@ -234,10 +301,14 @@ FileSaver(exp3.failToRecourse,
           exp3.overall_acc_list, 
           exp3.jsd_list, 
           exp3.avgRecourseCost_list, 
-          exp3.avgNewRecourseCostList, 
+          exp3.avgNewRecourseCostList,
           exp3.avgOriginalRecourseCostList,
           exp3.t_rate_list,
           exp3.model_shift_distance_list,
           exp3.failToRecourse_old,
-          exp3.failToRecourse_new
-        ).save_to_csv(RECOURSENUM, THRESHOLD, POSITIVE_RATIO, COSTWEIGHT, DATASET, current_time,DIRECTORY)
+          exp3.failToRecourse_new,
+          exp3.entropy_list,
+          exp3.avg_score_list,
+          exp3.overall_acc_list_withoutRecourse,
+          exp3.avg_score_on_last_train,
+        ).save_to_csv(RECOURSENUM, THRESHOLD, POSITIVE_RATIO, COSTWEIGHT, DATASET, current_time, DIRECTORY)

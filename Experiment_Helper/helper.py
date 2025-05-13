@@ -26,7 +26,7 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from Config.config import test, train, sample
+from Config.continual_MLP_config import test, train, sample
 from Models.synapticIntelligence import SynapticIntelligence
 
 pca = PCA(2).fit(train.x)
@@ -115,6 +115,10 @@ class Helper:
         self.important_feature_ranking = []
         self.entropy_list = []
         self.avg_score_list = []
+        self.historyTrainList_withoutRecourse = []
+        self.overall_acc_list_withoutRecourse = []
+        self.avg_score_on_last_train = []
+        self.historyTestList = []
 
     # def draw_proba_hist(self, ax: Axes | None = None, *, label: bool = False):
     def draw_proba_hist(self, ax0: Axes = None, ax1: Axes = None, *, label: bool = False):

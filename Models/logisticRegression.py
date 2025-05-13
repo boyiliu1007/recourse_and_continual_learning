@@ -57,30 +57,30 @@ def training(model: nn.Module, dataset: Dataset, max_epochs: int,testDataset: Da
         epoch_loss.append(train_loss)
         
         #evaluate model
-        model.eval()
-        val_loss = 0.0
-        with pt.no_grad():
-            for X_batch,Y_batch in test_loader:
-                # outputs = model(testDataset.x)
-                # validloss = criterion(outputs,testDataset.y)
-                outputs = model(X_batch).squeeze()
-                if outputs.dim() != Y_batch.dim():
-                    outputs = outputs.unsqueeze(-1)
-                validLoss = criterion(outputs,Y_batch)
-                val_loss += validLoss.item() * X_batch.size(0)
+        # model.eval()
+        # val_loss = 0.0
+        # with pt.no_grad():
+        #     for X_batch,Y_batch in test_loader:
+        #         # outputs = model(testDataset.x)
+        #         # validloss = criterion(outputs,testDataset.y)
+        #         outputs = model(X_batch).squeeze()
+        #         if outputs.dim() != Y_batch.dim():
+        #             outputs = outputs.unsqueeze(-1)
+        #         validLoss = criterion(outputs,Y_batch)
+        #         val_loss += validLoss.item() * X_batch.size(0)
         
-        # print("testData.y length: ",len(testData.y))
-        val_loss = val_loss / len(test_loader.dataset)
+        # # print("testData.y length: ",len(testData.y))
+        # val_loss = val_loss / len(test_loader.dataset)
         
-        #update learning rate according to val_loss
-        scheduler.step(val_loss)
+        # #update learning rate according to val_loss
+        # scheduler.step(val_loss)
         
         # if ( ( (_+1) % 15 == 0) | (_ == 0) ) & printLoss == True:
         #     print(f"Epoch {_+1}/{max_epochs}, Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, LR: {optimizer.param_groups[0]['lr']:.6f}")
-    if loss_list is not None:
-        loss_list.append(train_loss)
-    if val_loss_list is not None:
-        val_loss_list.append(val_loss)
+    # if loss_list is not None:
+    #     loss_list.append(train_loss)
+    # if val_loss_list is not None:
+    #     val_loss_list.append(val_loss)
     # model.eval()
     # print("epoch_loss: ",epoch_loss)
     if loss_list is not None:

@@ -5,16 +5,24 @@ import numpy as np
 
 # Define the dataset and metrics
 dataset = "credit"
-metrics_list = ["t_rate", "model_shift", "acc"]
+metrics_list = ["avg_score", "model_shift", "acc", "failToRecourse", "avgRecourseCost", "t_rate", "avg_score_on_last_train", "recourse_cost_ratio"]
 
 # Folder paths
 folder_paths = {
-    "Folder2": "New Experiments/diversek_output/0.7_1",
-    "Folder3": "New Experiments/topk_continual_static_output/0.7_1",
-    "Folder4": "New Experiments/topk_output/0.7_1",
-    "Folder5": "New Experiments/diversek_continual_output/0.7_1",
-    "Folder6": "New Experiments/topk_continual_output/0.7_1",
+    "Folder2": "New Experiments/diversek_output/5-15",
+    "Folder3": "New Experiments/topk_continual_static_output/5-15",
+    "Folder4": "New Experiments/topk_output/5-15",
+    "Folder5": "New Experiments/diversek_continual_output/5-15",
+    "Folder6": "New Experiments/topk_continual_output/5-15",
 }
+
+# folder_paths = {
+#     "Folder2": "New Experiments/diversek_MLP_output/5-15",
+#     "Folder3": "New Experiments/topk_continual_static_MLP_output/5-15",
+#     "Folder4": "New Experiments/topk_MLP_output/5-15",
+#     "Folder5": "New Experiments/diversek_continual_MLP_output/5-15",
+#     "Folder6": "New Experiments/topk_continual_MLP_output/5-15",
+# }
 
 # Dictionary to store extracted data
 data_dict = {
@@ -25,41 +33,51 @@ data_dict = {
 # Load data
 for folder_name, folder_path in folder_paths.items():
     if not os.path.exists(folder_path):
-        continue  # Skip if folder doesn't exist
+        continue
 
     for filename in os.listdir(folder_path):
         if filename.endswith(".csv"):
             parts = filename.split("_")
             if len(parts) < 6:
-                continue  # Skip invalid filenames
+                continue
 
-            dataset_name = parts[4]  # Extract dataset name
-            if dataset_name != dataset:  # Only process the "synthetic" dataset
+            dataset_name = parts[4]
+            if dataset_name != dataset:
                 continue
 
             file_path = os.path.join(folder_path, filename)
             df = pd.read_csv(file_path)
 
-            # Store values for each metric
             for metric in metrics_list:
-                if metric in df.columns:
-                    values = df[metric].astype(str).values  # Convert to string
-                    cleaned_values = []
+                if metric == "recourse_cost_ratio":
+                    if "avgNewRecourseCost" in df.columns and "avgOriginalRecourseCost" in df.columns:
+                        try:
+                            new = df["avgNewRecourseCost"].astype(float)
+                            original = df["avgOriginalRecourseCost"].astype(float)
+                            ratio = new / original.replace({0: np.nan})  # Avoid division by 0
+                            ratio_cleaned = ratio.replace([np.inf, -np.inf], np.nan).dropna().tolist()
+                            data_dict[folder_name][metric].extend(ratio_cleaned)
+                        except Exception as e:
+                            print(f"Error processing ratio in {file_path}: {e}")
+                    continue
 
-                    # Skip first 6 values if metric is "acc", otherwise skip 3
-                    skip_count = 1 if metric == "acc" or metric == "model_shift" else 0
+                # Continue with other metrics as before
+                if metric in df.columns:
+                    values = df[metric].astype(str).values
+                    cleaned_values = []
+                    skip_count = 1 if metric in ["acc", "model_shift", "failToRecourse", "avgRecourseCost"] else 0
                     values = values[skip_count:]
 
                     for val in values:
-                        if "tensor" in val:  # Check if it's a tensor format
+                        if "tensor" in val:
                             try:
-                                num = float(val.replace("tensor(", "").replace(")", ""))  # Extract numeric value
+                                num = float(val.replace("tensor(", "").replace(")", ""))
                                 cleaned_values.append(num)
                             except ValueError:
-                                print(f"Skipping invalid tensor value: {val}")  # Debugging
+                                print(f"Skipping invalid tensor value: {val}")
                         else:
                             try:
-                                cleaned_values.append(float(val))  # Convert normal numbers
+                                cleaned_values.append(float(val))
                             except ValueError:
                                 print(f"Skipping invalid value: {val}")
 
@@ -93,7 +111,7 @@ labels = {
 
 # Y-axis limits for each metric
 y_limits = {
-    "t_rate": (0, 1.5),
+    "avg_score": (5, -15),
     "model_shift": (0, 5),
     "acc": (0.5, 1)
 }
@@ -123,7 +141,7 @@ for metric in metrics_list:
         values = data_dict[folder_name][metric]  # Access the correct metric directly
         if values:
             x_values = np.arange(1, len(values) + 1) if metric == "acc" or metric == "model_shift" else np.arange(len(values))
-            line_alpha = 1.0 if folder_name in ["Folder2", "Folder5"] else 0.5
+            line_alpha = 1.0 if folder_name in ["Folder2", "Folder5", "Folder6"] else 0.5
             line, = ax.plot(x_values, values, linestyle=linestyles[folder_name], alpha=line_alpha,
                         color=colors[folder_name], linewidth=2, label=labels[folder_name])
 
@@ -143,21 +161,31 @@ for metric in metrics_list:
     ax.tick_params(axis='both', which='major', labelsize=20)
 
     # Only show side titles for "t_rate"
-    if metric == "t_rate":
-        ax.set_ylabel("Logistic Model", fontsize=23, fontweight="normal")
+    if metric == "avg_score":
+        
+        ax.set_ylabel("Logit Sum", fontsize=18, fontweight="normal")
+        ax.text(-0.25, 0.5, "Logistic Model", transform=ax.transAxes, 
+                fontsize=23, rotation='vertical', va='center')
+
 
     # Add title
     title_map = {
-    "t_rate": "Test Acceptance Rate",
+    "avg_score": "Higher Standard",
     "model_shift": "Model Shift",
-    "acc": "Short-Term Accuracy"
-}
+    "acc": "Short-Term Accuracy",
+    "failToRecourse": "Recourse Failure Rate",
+    "avgRecourseCost": "Average Recourse Cost",
+    "t_rate": "Test Acceptance Rate",
+    "avg_score_on_last_train": "Higher Standard",
+    "recourse_cost_ratio": "Ratio of Effort"
+    }
+
 
     ax.set_title(title_map.get(metric, ""), fontsize=23, fontweight="normal", pad=15)
     # fig.suptitle(title_map.get(metric, ""), fontsize=23, fontweight="normal")
 
     # Save the individual metric plot
-    plt.savefig(f"Result/LT0.7_1{metric}_comparison.png")
+    plt.savefig(f"Result/5-15L{metric}_comparison.png")
     plt.show()
 
 # Create a separate legend plot
@@ -165,7 +193,7 @@ fig_legend, ax_legend = plt.subplots(figsize=(20,1.5))
 ax_legend.axis("off")  # Hide axes
 
 # Create a legend
-preferred_order = ["Fair Top-k", "Fair Top-k with DCL"]
+preferred_order = ["Fair Top-k", "Fair Top-k with DCL", "Top-k with DCL"]
 
 # Sort handles and labels based on the preferred order
 sorted_legend = sorted(zip(legend_labels, legend_handles), key=lambda x: preferred_order.index(x[0]) if x[0] in preferred_order else len(preferred_order))

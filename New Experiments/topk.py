@@ -4,7 +4,6 @@ from copy import deepcopy
 import numpy as np
 from IPython.display import display
 import math
-from sklearn.ensemble import RandomForestClassifier
 
 import os
 import sys
@@ -13,14 +12,9 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from Experiment_Helper.helper import Helper, pca
 from Experiment_Helper.auxiliary import getWeights, update_train_data, FileSaver
 
-# from Models.MLP import MLP, training
 from Models.logisticRegression import LogisticRegression, training
-
 from Models.recourseGradient_simple import recourse
-
 from Config.config import train, test, sample, model, dataset, POSITIVE_RATIO # modified parameters for observations
-# from Config.MLP_config import train, test, sample, model, dataset, POSITIVE_RATIO # modified parameters for observations
-
 from Dataset.makeDataset import Dataset
 
 
@@ -56,14 +50,11 @@ class Exp2(Helper):
         self.round += 1
 
 
-        # if(self.round == 2): # here round 2 is the first round of recourse since round 1 is the initial model
-        #     self.first_model_params = deepcopy(self.model_params)
-        #     print("first model params", self.first_model_params)
         self.model_params = deepcopy(self.model.state_dict())
         
         if self.round != 1:
             #randomly select from self.sample with size of train and label it with model
-            self.train, isNewList = update_train_data(self.train, self.sample, self.model, 'none')
+            self.train, isNewList = update_train_data(self.train, self.sample, self.model, 'mixed')
 
             # find training data with label 0 and select RECOURSENUM of them
             data, labels = self.train.x, self.train.y
@@ -77,8 +68,6 @@ class Exp2(Helper):
             # perform recourse on the selected subset
             selected_subset = Dataset(data[selected_indices], labels[selected_indices].unsqueeze(1))
             recourse_weight = getWeights(self.train.x.shape[1], COSTWEIGHT) 
-            
-
             recoursed, action = recourse(
                 self.model,
                 selected_subset,
@@ -106,16 +95,52 @@ class Exp2(Helper):
             mask[sorted_indices[:cutoff_index]] = 1
             self.train.y = mask.float().squeeze(1)
             
+            # calculate the average score of the model on the last training data
+            score = self.train.x @ self.model.linear.weight.T + self.model.linear.bias
+            avg_score1 = score.mean()
 
             # train the model with the updated dataset
-            training(self.model, self.train, 50, self.test,loss_list=self.RegreesionModelLossList,val_loss_list=self.RegreesionModel_valLossList,printLoss=True)
+            training(self.model, self.train, 10, self.test,loss_list=self.RegreesionModelLossList,val_loss_list=self.RegreesionModel_valLossList,printLoss=True)
             
         #calculate metrics: ========================================================================
 
+        #calculate higher standard (model output before sigmoid) based on last train data
+        if self.historyTrainList != []:
+            last_data = self.historyTrainList[-1]
+            last_data.x = self.train.x
+            score = last_data.x @ self.model.linear.weight.T + self.model.linear.bias
+            avg_score2 = score.mean()
+            
+            self.avg_score_on_last_train.append(avg_score1.item() - avg_score2.item())
+        else:
+            self.avg_score_on_last_train.append(0)
+            
         #calculate short term accuracy
         current_data = Dataset(self.train.x, self.train.y)
         self.historyTrainList.append(current_data)
-        self.overall_acc_list.append(self.calculate_AA(self.model, self.historyTrainList, 7))
+        with pt.no_grad():
+            y_prob_test: pt.Tensor = self.model(self.test.x)
+        y_prob_test = y_prob_test.squeeze(1)
+        y_pred_test = (y_prob_test > 0.5).float()
+        self.test.y = y_pred_test
+        current_test = Dataset(self.test.x, self.test.y)
+        self.historyTestList.append(current_test)
+        self.overall_acc_list.append(self.calculate_AA(self.model, self.historyTestList, 7))
+
+        #calculate short term accuracy without recourse
+        if self.round != 1:
+            all_indices = pt.arange(self.train.x.size(0))  # All possible indices
+            mask = pt.ones(self.train.x.size(0), dtype=bool)
+            mask[selected_indices] = False  # Mask out the selected indices
+            
+
+            current_data_without_recourse = Dataset(self.train.x[mask], self.train.y[mask])
+            self.historyTrainList_withoutRecourse.append(current_data_without_recourse)
+            self.overall_acc_list_withoutRecourse.append(self.calculate_AA(self.model, self.historyTrainList_withoutRecourse, 7))
+        
+        else:
+            self.historyTrainList_withoutRecourse.append(current_data)
+            self.overall_acc_list_withoutRecourse.append(self.overall_acc_list[-1])
 
         if self.round != 1:
             #calculate ftr
@@ -167,10 +192,10 @@ class Exp2(Helper):
         #calculate model shift distance
         last_model_params = self.model_params
         current_model_params = self.model.state_dict()
-        shift_distance = sum(
-            pt.norm(last_model_params[key] - current_model_params[key], p=2) ** 2
-            for key in last_model_params.keys()
-        ).sqrt()
+        shift_distance = pt.norm(
+            pt.cat([pt.flatten(last_model_params[key] - current_model_params[key])
+                for key in last_model_params.keys()]), p=2
+        )
         self.model_shift_distance_list.append(shift_distance)
 
         
@@ -210,9 +235,15 @@ exp2.plot_feature_ranking()
 FileSaver(exp2.failToRecourse, 
           exp2.overall_acc_list, 
           exp2.jsd_list, 
-        #   exp2.avgRecourseCost_list, 
+          exp2.avgRecourseCost_list, 
+          exp2.avgNewRecourseCostList,
+          exp2.avgOriginalRecourseCostList,
           exp2.t_rate_list,
           exp2.model_shift_distance_list,
+          exp2.failToRecourse_old,
+          exp2.failToRecourse_new,
           exp2.entropy_list,
-          exp2.avg_score_list
+          exp2.avg_score_list,
+          exp2.overall_acc_list_withoutRecourse,
+          exp2.avg_score_on_last_train,
         ).save_to_csv(RECOURSENUM, THRESHOLD, POSITIVE_RATIO, COSTWEIGHT, DATASET, current_time, DIRECTORY)

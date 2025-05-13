@@ -24,7 +24,6 @@ def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.T
     loss: pt.Tensor
     r_model = Recourse(dataset.x.shape)
     criterion = nn.BCELoss()
-    # optimizer = optim.Adam(r_model.parameters(), lr=0.1)
     optimizer = optim.Adam(r_model.parameters(), lr=0.5)
     
     # threshold = pt.ones(dataset.y.size())
@@ -69,6 +68,31 @@ def recourse(c_model: nn.Module, dataset: Dataset, max_epochs: int, weight: pt.T
     dataset.x = x_hat.detach() 
     dataset.y = (c_model(dataset.x) > 0.5).float()
     score = c_model(dataset.x)
-    print("score",score.squeeze())
+    print("Average Recourse Score:", score.mean().item())
 
+    if cost_list is not None:
+        avgRecourseCost = 0.0
+        avgOriginalRecourseCost = 0.0
+        avgNewRecourseCost = 0.0
+        newCount = 0
+        with pt.no_grad():
+            recoursedX,action = r_model(dataset.x)
+        sqr_action = action ** 2
+        weighted_action_cost = (weight * sqr_action).sum(dim = 1)
+        avgRecourseCost = weighted_action_cost.mean().item()
+        for idx,t in enumerate(weighted_action_cost):
+            if idx < isNew.size(0) and isNew[idx]:
+                newCount += 1
+                avgNewRecourseCost += t.item()
+            else:
+                avgOriginalRecourseCost += t.item()
+        
+        if newCount == 0:
+            avgNewRecourseCost = 0.0
+        else:
+            avgNewRecourseCost /= newCount
+        avgOriginalRecourseCost /= len(weighted_action_cost) - newCount
+        cost_list.append(avgRecourseCost)
+        new_cost_list.append(avgNewRecourseCost)
+        original_cost_list.append(avgOriginalRecourseCost)
     return dataset, return_act.detach()
