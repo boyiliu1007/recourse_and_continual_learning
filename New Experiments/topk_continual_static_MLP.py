@@ -130,6 +130,8 @@ class Exp3(Helper):
         current_test = Dataset(self.test.x, self.test.y)
         self.historyTestList.append(current_test)
         self.overall_acc_list.append(self.calculate_AA(self.model, self.historyTestList, 7))
+        self.balanced_acc_list.append(self.calculate_AA(self.model, self.historyTestList, 7, "balanced"))
+        self.cohen_acc_list.append(self.calculate_AA(self.model, self.historyTestList, 7, "cohen_kappa"))
 
         #calculate short term accuracy without recourse
         if self.round != 1:
@@ -249,5 +251,7 @@ FileSaver(exp3.failToRecourse,
           exp3.entropy_list,
           exp3.avg_score_list,
           exp3.overall_acc_list_withoutRecourse,
-          exp3.avg_score_on_last_train
+          exp3.avg_score_on_last_train,
+          exp3.balanced_acc_list,
+          exp3.cohen_acc_list
         ).save_to_csv(RECOURSENUM, THRESHOLD, POSITIVE_RATIO, COSTWEIGHT, DATASET, current_time, DIRECTORY)

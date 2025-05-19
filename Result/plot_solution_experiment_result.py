@@ -5,24 +5,24 @@ import numpy as np
 
 # Define the dataset and metrics
 dataset = "credit"
-metrics_list = ["avg_score", "model_shift", "acc", "failToRecourse", "avgRecourseCost", "t_rate", "avg_score_on_last_train", "recourse_cost_ratio"]
+metrics_list = ["avg_score", "model_shift", "acc", "failToRecourse", "avgRecourseCost", "t_rate", "avg_score_on_last_train", "recourse_cost_ratio", "balanced_acc", "cohen_acc"]
 
 # Folder paths
-folder_paths = {
-    "Folder2": "New Experiments/diversek_output/5-15",
-    "Folder3": "New Experiments/topk_continual_static_output/5-15",
-    "Folder4": "New Experiments/topk_output/5-15",
-    "Folder5": "New Experiments/diversek_continual_output/5-15",
-    "Folder6": "New Experiments/topk_continual_output/5-15",
-}
-
 # folder_paths = {
-#     "Folder2": "New Experiments/diversek_MLP_output/5-15",
-#     "Folder3": "New Experiments/topk_continual_static_MLP_output/5-15",
-#     "Folder4": "New Experiments/topk_MLP_output/5-15",
-#     "Folder5": "New Experiments/diversek_continual_MLP_output/5-15",
-#     "Folder6": "New Experiments/topk_continual_MLP_output/5-15",
+#     "Folder2": "New Experiments/diversek_output/5-16",
+#     "Folder3": "New Experiments/topk_continual_static_output/5-16",
+#     "Folder4": "New Experiments/topk_output/5-16",
+#     "Folder5": "New Experiments/diversek_continual_output/5-16",
+#     "Folder6": "New Experiments/topk_continual_output/5-16",
 # }
+
+folder_paths = {
+    "Folder2": "New Experiments/diversek_MLP_output/5-16",
+    "Folder3": "New Experiments/topk_continual_static_MLP_output/5-16",
+    "Folder4": "New Experiments/topk_MLP_output/5-16",
+    "Folder5": "New Experiments/diversek_continual_MLP_output/5-16",
+    "Folder6": "New Experiments/topk_continual_MLP_output/5-16",
+}
 
 # Dictionary to store extracted data
 data_dict = {
@@ -65,7 +65,7 @@ for folder_name, folder_path in folder_paths.items():
                 if metric in df.columns:
                     values = df[metric].astype(str).values
                     cleaned_values = []
-                    skip_count = 1 if metric in ["acc", "model_shift", "failToRecourse", "avgRecourseCost"] else 0
+                    skip_count = 1 if metric in ["acc", "model_shift", "failToRecourse", "avgRecourseCost", "balanced_acc", "cohen_acc"] else 0
                     values = values[skip_count:]
 
                     for val in values:
@@ -111,7 +111,7 @@ labels = {
 
 # Y-axis limits for each metric
 y_limits = {
-    "avg_score": (5, -15),
+    "avg_score": (15, -100),
     "model_shift": (0, 5),
     "acc": (0.5, 1)
 }
@@ -164,7 +164,7 @@ for metric in metrics_list:
     if metric == "avg_score":
         
         ax.set_ylabel("Logit Sum", fontsize=18, fontweight="normal")
-        ax.text(-0.25, 0.5, "Logistic Model", transform=ax.transAxes, 
+        ax.text(-0.25, 0.5, "MLP", transform=ax.transAxes, 
                 fontsize=23, rotation='vertical', va='center')
 
 
@@ -177,15 +177,17 @@ for metric in metrics_list:
     "avgRecourseCost": "Average Recourse Cost",
     "t_rate": "Test Acceptance Rate",
     "avg_score_on_last_train": "Higher Standard",
-    "recourse_cost_ratio": "Ratio of Effort"
+    "recourse_cost_ratio": "Ratio of Effort",
+    "balanced_acc": "Short-Term Balanced Accuracy",
+    "cohen_acc": "Cohen's Kappa",
     }
 
 
-    ax.set_title(title_map.get(metric, ""), fontsize=23, fontweight="normal", pad=15)
+    # ax.set_title(title_map.get(metric, ""), fontsize=23, fontweight="normal", pad=15)
     # fig.suptitle(title_map.get(metric, ""), fontsize=23, fontweight="normal")
 
     # Save the individual metric plot
-    plt.savefig(f"Result/5-15L{metric}_comparison.png")
+    plt.savefig(f"Result/5-16{metric}_comparison.png")
     plt.show()
 
 # Create a separate legend plot

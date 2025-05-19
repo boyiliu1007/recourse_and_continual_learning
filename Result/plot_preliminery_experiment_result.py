@@ -5,12 +5,12 @@ import numpy as np
 
 # Define datasets and metrics
 datasets = ["UCIcredit", "credit", "synthetic"]
-metrics_list = ["t_rate", "model_shift", "acc"]
+metrics_list = ["avg_score", "t_rate", "balanced_acc"]
 
 # Folder paths
 folder_paths = {
-    "Folder2": "New Experiments/topk_output/five3",
-    "Folder3": "New Experiments/topk_MLP_output/five3"
+    "Folder2": "New Experiments/topk_output/5-16",
+    "Folder3": "New Experiments/topk_MLP_output/5-16"
 }
 
 # Dictionary to store extracted data
@@ -44,7 +44,7 @@ for folder_name, folder_path in folder_paths.items():
                     cleaned_values = []
 
                     # Skip first 6 values if metric is "acc", otherwise skip 3
-                    skip_count = 1 if metric == "acc" or metric == "model_shift" else 0
+                    skip_count = 1 if metric == "balanced_acc" else 0
                     values = values[skip_count:]
 
                     for val in values:
@@ -79,23 +79,23 @@ labels = {
 # Y-axis limits for each metric
 y_limits = {
     "t_rate": (0, 1.4),
-    "model_shift": (0, 5),
-    "acc": (0.5, 1)
+    "avg_score": (0, -22),
+    "balanced_acc": (0.5, 1)
 }
 
-# Compute adaptive y-limits for "model_shift"
-all_model_shift_values = []
-for folder_name in folder_paths.keys():
-    for dataset in datasets:
-        all_model_shift_values.extend(data_dict[folder_name][dataset]["model_shift"])
+# # Compute adaptive y-limits for "model_shift"
+# all_model_shift_values = []
+# for folder_name in folder_paths.keys():
+#     for dataset in datasets:
+#         all_model_shift_values.extend(data_dict[folder_name][dataset]["model_shift"])
 
-# Set adaptive limits
-if all_model_shift_values:
-    min_shift, max_shift = min(all_model_shift_values), max(all_model_shift_values)
-    margin = (max_shift - min_shift) * 0.1  # 10% margin
-    y_limits["model_shift"] = (max(0, min_shift - margin), max_shift + margin)
-else:
-    y_limits["model_shift"] = (0, 10)  # Default fallback in case no data exists
+# # Set adaptive limits
+# if all_model_shift_values:
+#     min_shift, max_shift = min(all_model_shift_values), max(all_model_shift_values)
+#     margin = (max_shift - min_shift) * 0.1  # 10% margin
+#     y_limits["model_shift"] = (max(0, min_shift - margin), max_shift + margin)
+# else:
+#     y_limits["model_shift"] = (0, 10)  # Default fallback in case no data exists
 
 # Store legend handles for separate legend plot
 legend_handles = []
@@ -111,8 +111,8 @@ for metric in metrics_list:
         for folder_name in folder_paths.keys():
             values = data_dict[folder_name][dataset][metric]
             if values:
-                # Ensure x starts from 1 if metric is "acc"
-                x_values = np.arange(1, len(values) + 1) if metric == "acc" or metric == "model_shift" else np.arange(len(values))
+                # Ensure x starts from 1 if metric is "balanced_acc"
+                x_values = np.arange(1, len(values) + 1) if metric == "balanced_acc" else np.arange(len(values))
 
                 line, = ax.plot(x_values, values, linestyle=linestyles[folder_name], alpha=0.8,
                                 color=colors[folder_name], linewidth=2, label=labels[folder_name])
@@ -127,7 +127,7 @@ for metric in metrics_list:
             ax.set_ylim(y_limits[metric])
 
         ax.grid(True, linestyle=":", alpha=0.5)
-        if metric == "t_rate":
+        if metric == "avg_score":
             ax.set_ylabel(f"{dataset}", fontsize=23, fontweight="normal")
 
         # Ensure x-axis starts from 1 when plotting "acc"
@@ -136,14 +136,14 @@ for metric in metrics_list:
 
     # Add title
     if metric == "t_rate":
-        fig.suptitle("Test Acceptance Rate", fontsize=23, fontweight="normal", x=0.57)
-    elif metric == "model_shift":
-        fig.suptitle("Model Shift", fontsize=23, fontweight="normal")
-    elif metric == "acc":
-        fig.suptitle("Short-Term Accuracy", fontsize=23, fontweight="normal")
+        fig.suptitle("Test Acceptance Rate", fontsize=23, fontweight="normal", x=0.53)
+    elif metric == "avg_score":
+        fig.suptitle("Higher Standard", fontsize=23, fontweight="normal", x=0.57)
+    elif metric == "balanced_acc":
+        fig.suptitle("Short-Term Balanced Accuracy", fontsize=23, fontweight="normal", x=0.53)
 
-    # If the metric is 'acc', place the legend in the bottom-right corner
-    if metric == "acc":
+    # If the metric is 'balanced_acc', place the legend in the bottom-right corner
+    if metric == "balanced_acc":
         plt.legend(loc='lower right', fontsize=23, frameon=True)
 
     # Save the individual metric plot

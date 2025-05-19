@@ -95,7 +95,7 @@ def update_train_data(train, sample, model, type = 'all', expected_size = None):
     print(f"Number of 1s: {num_ones}")
 
 class FileSaver:
-    def __init__(self, fail_to_recourse, overall_acc_list, jsd_list, avgRecourseCost_list, avgNewRecourseCostList, avgOriginalRecourseCostList, t_rate_list, model_shift_list, failToRecourse_old, failToRecourse_new, entropy_list, avg_score_list, overall_acc_list_withoutRecourse, avg_score_on_last_train):
+    def __init__(self, fail_to_recourse, overall_acc_list, jsd_list, avgRecourseCost_list, avgNewRecourseCostList, avgOriginalRecourseCostList, t_rate_list, model_shift_list, failToRecourse_old, failToRecourse_new, entropy_list, avg_score_list, overall_acc_list_withoutRecourse, avg_score_on_last_train, balanced_acc_list, cohen_acc_list):
         # Initialize the attributes with the provided lists
         self.failToRecourse = fail_to_recourse
         self.overall_acc_list = overall_acc_list
@@ -111,6 +111,8 @@ class FileSaver:
         self.avg_score_list = avg_score_list
         self.overall_acc_list_withoutRecourse = overall_acc_list_withoutRecourse
         self.avg_score_on_last_train = avg_score_on_last_train
+        self.balanced_acc_list = balanced_acc_list
+        self.cohen_acc_list = cohen_acc_list
 
     def save_to_csv(self, recourse_num, threshold, acceptance_rate, cost_weight, dataset, current_time, directory = ''):
         filename = f"{recourse_num}_{threshold}_{acceptance_rate}_{cost_weight}_{dataset}_{current_time}.csv"
@@ -137,6 +139,8 @@ class FileSaver:
         print(len(self.avg_score_list))
         print(len(self.overall_acc_list_withoutRecourse))
         print(len(self.avg_score_on_last_train))
+        print(len(self.balanced_acc_list))
+        print(len(self.cohen_acc_list))
 
         # since short term accuracy cannot calculate the first 2 element so insert two 0s here
         
@@ -155,7 +159,9 @@ class FileSaver:
             'entropy': self.entropy_list,
             'avg_score': self.avg_score_list,
             'acc_withoutRecourse': self.overall_acc_list_withoutRecourse,
-            'avg_score_on_last_train': self.avg_score_on_last_train
+            'avg_score_on_last_train': self.avg_score_on_last_train,
+            'balanced_acc': self.balanced_acc_list,
+            'cohen_acc': self.cohen_acc_list
         }
         for key in data.keys():
             print(f"{key}: {len(data[key])}")

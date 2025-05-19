@@ -19,6 +19,8 @@ from copy import deepcopy
 import numpy as np
 from numpy.typing import NDArray
 from sklearn.neighbors import KernelDensity
+from sklearn.metrics import balanced_accuracy_score
+from sklearn.metrics import cohen_kappa_score
 from scipy.spatial.distance import jensenshannon
 from tqdm import tqdm
 
@@ -26,7 +28,7 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from Config.continual_MLP_config import test, train, sample
+from Config.config import test, train, sample
 from Models.synapticIntelligence import SynapticIntelligence
 
 pca = PCA(2).fit(train.x)
@@ -119,6 +121,8 @@ class Helper:
         self.overall_acc_list_withoutRecourse = []
         self.avg_score_on_last_train = []
         self.historyTestList = []
+        self.balanced_acc_list = []
+        self.cohen_acc_list = []
 
     # def draw_proba_hist(self, ax: Axes | None = None, *, label: bool = False):
     def draw_proba_hist(self, ax0: Axes = None, ax1: Axes = None, *, label: bool = False):
@@ -935,6 +939,19 @@ class Helper:
       accuracy = sum(correct_predictions) / len(correct_predictions)
       return accuracy
     
+    def calculate_balanced_accuracy(self, predicted_results, actual_labels, threshold=0.5):
+        y_pred = (predicted_results >= threshold).float()
+        y_true_np = actual_labels.cpu().numpy()
+        y_pred_np = y_pred.cpu().numpy()
+        bal_acc = balanced_accuracy_score(y_true_np, y_pred_np)
+        return bal_acc
+    
+    def calculate_cohen_kappa_accuracy(self, predicted_results, actual_labels, threshold=0.5):
+        y_true_np = actual_labels.cpu().numpy()
+        y_pred_np = (predicted_results >= threshold).float().cpu().numpy()
+        cohen_kappa = cohen_kappa_score(y_true_np, y_pred_np)
+        return cohen_kappa
+
     def _weight_func(self, x):
         return 1
     
@@ -948,23 +965,27 @@ class Helper:
             sum += i
         return [w / sum for w in weights]
 
-    def calculate_AA(self, kth_model: nn.Module, jth_data_after_recourse: list, rangenum):
+    def calculate_AA(self, kth_model: nn.Module, jth_data_after_recourse: list, rangenum, option = 'typical'):
         rangenum = min(rangenum, len(jth_data_after_recourse))
         rangenum -= 1
         if jth_data_after_recourse:
             kth_model.eval()
             sum = 0
             weights = self._get_weight(rangenum)
-
             
             # do each historical task
             for j in range(-2, -rangenum - 2, -1):
                 pred = kth_model(jth_data_after_recourse[j].x)
-                acc = self.calculate_accuracy(pred, jth_data_after_recourse[j].y) * weights[j+1]
-                self.testacc.append(acc)
+                if option == 'typical':
+                    acc = self.calculate_accuracy(pred, jth_data_after_recourse[j].y) * weights[j+1]
+                elif option == 'balanced':
+                    acc = self.calculate_balanced_accuracy(pred, jth_data_after_recourse[j].y) * weights[j+1]
+                elif option == 'cohen_kappa':
+                    acc = self.calculate_cohen_kappa_accuracy(pred, jth_data_after_recourse[j].y) * weights[j+1]
+                else:
+                    raise ValueError("Invalid option for accuracy calculation.")
                 sum += acc
 
-            self.testacc.append('|')
             return sum
 
         print("jth_data_after_recourse cannot be empty")

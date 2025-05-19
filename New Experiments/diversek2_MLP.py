@@ -133,17 +133,66 @@ class Exp3(Helper):
             # # Remove only unselected positive data from training set
             # keep_indices = np.setdiff1d(np.arange(self.train.x.shape[0]), unselected_indices)
             # self.train.x = self.train.x[keep_indices]             
-            # self.train.y = self.train.y[keep_indices]             
+            # self.train.y = self.train.y[keep_indices]  
+            # 
+
+            original_train_x = self.train.x.clone().detach()
+            original_train_y = self.train.y.clone().detach()
+            negative_indices = pt.where(self.train.y == 0)[0]
+            with pt.no_grad():
+                y_prob_all = self.model(self.train.x).squeeze()
+            negative_scores = y_prob_all[negative_indices]
+            high_conf_neg_indices = negative_indices[negative_scores > 0.7]
+            keep_indices = pt.tensor([i for i in range(self.train.x.shape[0]) if i not in high_conf_neg_indices], dtype=pt.long)
+            self.train.x = self.train.x[keep_indices]
+            self.train.y = self.train.y[keep_indices]           
 
             # train the model with the updated dataset
             training(self.model, self.train, 10, self.test,loss_list=self.RegreesionModelLossList,val_loss_list=self.RegreesionModel_valLossList,printLoss=True)
 
+            self.train.x = original_train_x
+            self.train.y = original_train_y
 
         #calculate metrics: ========================================================================
+        #calculate higher standard (model output before sigmoid) based on last train data
+        if self.historyTrainList != []:
+            last_data = self.historyTrainList[-1]
+            last_data.x = self.train.x
+
+            # Forward pass through layers up to the final linear layer
+            hidden1 = pt.relu(self.model.layers[0](last_data.x))
+            hidden2 = pt.relu(self.model.layers[2](hidden1))
+            final_score2 = self.model.layers[4](hidden2)  # raw score before Sigmoid
+            avg_score2 = final_score2.mean()
+
+            # Manually compute the same thing using self.model_params
+            w1 = self.model_params['layers.0.weight']
+            b1 = self.model_params['layers.0.bias']
+            w2 = self.model_params['layers.2.weight']
+            b2 = self.model_params['layers.2.bias']
+            w3 = self.model_params['layers.4.weight']
+            b3 = self.model_params['layers.4.bias']
+
+            h1 = pt.relu(last_data.x @ w1.T + b1)
+            h2 = pt.relu(h1 @ w2.T + b2)
+            final_score1 = h2 @ w3.T + b3
+            avg_score1 = final_score1.mean()
+
+            self.avg_score_on_last_train.append(avg_score1.item() - avg_score2.item())
+        else:
+            self.avg_score_on_last_train.append(0)
+            
         #calculate short term accuracy
         current_data = Dataset(self.train.x, self.train.y)
         self.historyTrainList.append(current_data)
-        self.overall_acc_list.append(self.calculate_AA(self.model, self.historyTrainList, 3))
+        with pt.no_grad():
+            y_prob_test: pt.Tensor = self.model(self.test.x)
+        y_prob_test = y_prob_test.squeeze(1)
+        y_pred_test = (y_prob_test > 0.5).float()
+        self.test.y = y_pred_test
+        current_test = Dataset(self.test.x, self.test.y)
+        self.historyTestList.append(current_test)
+        self.overall_acc_list.append(self.calculate_AA(self.model, self.historyTestList, 7))
         
         # if self.round != 1:
         #     #add back the unselected positive data in original order
@@ -158,7 +207,18 @@ class Exp3(Helper):
         #     self.train.x = new_x
         #     self.train.y = new_y
 
+        if self.round == 1:
+            self.historyTrainList_withoutRecourse.append(current_data)
+            self.overall_acc_list_withoutRecourse.append(self.calculate_AA(self.model, self.historyTrainList_withoutRecourse, 7))
+
         if self.round != 1:
+            # calculate short term accuracy without recourse
+            mask = pt.ones(self.train.x.size(0), dtype=bool)
+            mask[selected_indices] = False  # Mask out the selected indices
+            current_data_without_recourse = Dataset(self.train.x[mask], self.train.y[mask])
+            self.historyTrainList_withoutRecourse.append(current_data_without_recourse)
+            self.overall_acc_list_withoutRecourse.append(self.calculate_AA(self.model, self.historyTrainList_withoutRecourse, 7))
+
             #calculate ftr
             fail_positions = pt.where(self.train.y[selected_indices] == 0)[0]
             success_positions = pt.where(self.train.y[selected_indices] == 1)[0]
@@ -265,5 +325,7 @@ FileSaver(exp3.failToRecourse,
           exp3.failToRecourse_old,
           exp3.failToRecourse_new,
           exp3.entropy_list,
-          exp3.avg_score_list
+          exp3.avg_score_list,
+          exp3.overall_acc_list_withoutRecourse,
+          exp3.avg_score_on_last_train
         ).save_to_csv(RECOURSENUM, THRESHOLD, POSITIVE_RATIO, COSTWEIGHT, DATASET, current_time, DIRECTORY)

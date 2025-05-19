@@ -109,7 +109,6 @@ class Exp3(Helper):
             # Select top-K
             top_indices = np.argsort(combined_score)[-sample_size:]
             top_indices = np.array(top_indices).flatten()
-            print(f"top_indices: {len(top_indices)}")
             sampled_indices = positive_indices[top_indices]
             
 
@@ -135,18 +134,63 @@ class Exp3(Helper):
             # self.train.x = self.train.x[keep_indices]             
             # self.train.y = self.train.y[keep_indices]             
 
+            original_train_x = self.train.x.clone().detach()
+            original_train_y = self.train.y.clone().detach()
+            negative_indices = pt.where(self.train.y == 0)[0]
+            with pt.no_grad():
+                y_prob_all = self.model(self.train.x).squeeze()
+            negative_scores = y_prob_all[negative_indices]
+            high_conf_neg_indices = negative_indices[negative_scores > 0.7]
+            keep_indices = pt.tensor([i for i in range(self.train.x.shape[0]) if i not in high_conf_neg_indices], dtype=pt.long)
+            self.train.x = self.train.x[keep_indices]
+            self.train.y = self.train.y[keep_indices]
+            
             # train the model with the updated dataset
             if(self.jsd_list == []):
                 continual_training(self.si, self.train, 10, lambda_ = 0, observe_range=3)
             else:
                 continual_training(self.si, self.train, 10, lambda_ = 0.00001/(self.jsd_list[-1]), observe_range=3)
 
+            self.train.x = original_train_x
+            self.train.y = original_train_y
 
         #calculate metrics: ========================================================================
+        #calculate higher standard (model output before sigmoid) based on last train data
+        if self.historyTrainList != []:
+            last_data = self.historyTrainList[-1]
+            last_data.x = self.train.x
+            score = last_data.x @ self.model.linear.weight.T + self.model.linear.bias
+            avg_score2 = score.mean()
+            score = last_data.x @ self.model_params['linear.weight'].T + self.model_params['linear.bias']
+            avg_score1 = score.mean()
+            self.avg_score_on_last_train.append(avg_score1.item() - avg_score2.item())
+        else:
+            self.avg_score_on_last_train.append(0)
+            
         #calculate short term accuracy
         current_data = Dataset(self.train.x, self.train.y)
         self.historyTrainList.append(current_data)
-        self.overall_acc_list.append(self.calculate_AA(self.model, self.historyTrainList, 7))
+        with pt.no_grad():
+            y_prob_test: pt.Tensor = self.model(self.test.x)
+        y_prob_test = y_prob_test.squeeze(1)
+        y_pred_test = (y_prob_test > 0.5).float()
+        self.test.y = y_pred_test
+        current_test = Dataset(self.test.x, self.test.y)
+        self.historyTestList.append(current_test)
+        self.overall_acc_list.append(self.calculate_AA(self.model, self.historyTestList, 7))
+        
+        if self.round != 1:
+            mask = pt.ones(self.train.x.size(0), dtype=bool)
+            mask[selected_indices] = False  # Mask out the selected indices
+            
+
+            current_data_without_recourse = Dataset(self.train.x[mask], self.train.y[mask])
+            self.historyTrainList_withoutRecourse.append(current_data_without_recourse)
+            self.overall_acc_list_withoutRecourse.append(self.calculate_AA(self.model, self.historyTrainList_withoutRecourse, 7))
+        
+        else:
+            self.historyTrainList_withoutRecourse.append(current_data)
+            self.overall_acc_list_withoutRecourse.append(self.overall_acc_list[-1])
 
         if self.round != 1:
             #calculate ftr
@@ -245,5 +289,7 @@ FileSaver(exp3.failToRecourse,
           exp3.failToRecourse_old,
           exp3.failToRecourse_new,
           exp3.entropy_list,
-          exp3.avg_score_list
+          exp3.avg_score_list,
+          exp3.overall_acc_list_withoutRecourse,
+          exp3.avg_score_on_last_train
         ).save_to_csv(RECOURSENUM, THRESHOLD, POSITIVE_RATIO, COSTWEIGHT, DATASET, current_time, DIRECTORY)
